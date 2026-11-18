@@ -88,14 +88,14 @@ static class WindowDisplayProbe {
             WaitForOverlay(status);
             VerifyPresentation(controls, hwnd, "GPU nativa en ventana");
 
-            ((Button)ui.FindName("Borderless")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
             WaitForOverlay(status);
-            VerifyPresentation(controls, hwnd, "GPU nativa sin bordes");
+            VerifyPresentation(controls, hwnd, "GPU nativa en ventana");
             var area = BorderlessWindow.ClientBounds(hwnd);
             var point = new Native.POINT { X = area.X + area.Width / 2, Y = area.Y + area.Height / 2 };
             if (Native.GetAncestor(Native.WindowFromPoint(point), 2) != hwnd || Native.GetForegroundWindow() != hwnd)
                 throw new Exception("El filtro alteró el destino del ratón o el foco.");
-            Console.WriteLine("Superposición activa sin bordes; foco y destino del ratón conservados.");
+            Console.WriteLine("Superposición activa; foco y destino del ratón conservados.");
         } finally { controls.Close(); }
         if (BorderlessWindow.ClientBounds(hwnd) != before)
             throw new Exception("La ventana no recuperó su geometría al cerrar Nitidez.");

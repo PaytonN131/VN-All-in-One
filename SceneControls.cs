@@ -43,6 +43,8 @@ sealed class SceneControls : IDisposable {
         record.Click += delegate { if (recording != null) Stop(); else Start(); };
         screenshot.Click += delegate { Screenshot(); };
         edit.Click += delegate { Edit(); };
+        ((Button)ui.FindName("VideoFolder")).Click+=delegate{try{CaptureFiles.OpenFolder("Videos",target);}catch(Exception ex){notice="No se pudo abrir la carpeta: "+ex.Message;}Refresh();};
+        ((Button)ui.FindName("ScreenshotFolder")).Click+=delegate{try{CaptureFiles.OpenFolder("Capturas",target);}catch(Exception ex){notice="No se pudo abrir la carpeta: "+ex.Message;}Refresh();};
         ((Button)ui.FindName("SceneRename")).Click+=delegate{
             try{string renamed=CaptureFiles.RenameDialog(owner,ui.Resources,"Videos");if(renamed!=null){lastVideo=renamed;notice="Vídeo renombrado: "+renamed;}}
             catch(Exception ex){notice="No se pudo renombrar: "+ex.Message;}Refresh();
@@ -228,6 +230,8 @@ sealed class SceneControls : IDisposable {
 sealed class SceneEditor : Window {
     readonly string source;
     readonly string outputFolder;
+    readonly TextBox fileName=new TextBox{IsReadOnly=false,Cursor=System.Windows.Input.Cursors.IBeam,Margin=new Thickness(0,5,0,8)};
+    readonly Button folderButton=new Button{Content="Abrir carpeta"};
     readonly MediaElement media = new MediaElement { LoadedBehavior = MediaState.Manual,
         UnloadedBehavior = MediaState.Close, ScrubbingEnabled = true, Stretch = Stretch.Uniform };
     readonly Slider position = new Slider(), start = new Slider(), end = new Slider();
@@ -261,8 +265,10 @@ sealed class SceneEditor : Window {
         controls.Children.Add(trimInfo);
         controls.Children.Add(new TextBlock { Text = "Inicio del recorte" }); controls.Children.Add(start);
         controls.Children.Add(new TextBlock { Text = "Final del recorte" }); controls.Children.Add(end);
+        controls.Children.Add(new TextBlock{Text="Nombre del vídeo que vas a guardar (sin .mp4)",Margin=new Thickness(0,8,0,0)});
+        fileName.Text="Recorte_"+DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");controls.Children.Add(fileName);
         var actions = new WrapPanel { Margin = new Thickness(0, 8, 0, 8) };
-        foreach (var button in new[] { play, stop, markStart, markEnd, save, recycle }) { button.Margin = new Thickness(0, 0, 8, 4); actions.Children.Add(button); }
+        foreach (var button in new[] { play, stop, markStart, markEnd, save, recycle, folderButton }) { button.Margin = new Thickness(0, 0, 8, 4); actions.Children.Add(button); }
         controls.Children.Add(actions); controls.Children.Add(status);
         root.Children.Add(new Border { Background = Brushes.Black, Child = media });
 
@@ -295,6 +301,7 @@ sealed class SceneEditor : Window {
         markStart.Click += delegate { start.Value = position.Value; };
         markEnd.Click += delegate { end.Value = position.Value; };
         save.Click += async delegate { await Export(); };
+        folderButton.Click+=delegate{try{CaptureFiles.OpenPath(outputFolder);}catch(Exception ex){status.Text="No se pudo abrir la carpeta: "+ex.Message;}};
         recycle.Click += async delegate { await RecycleVideo(); };
         Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (Busy) e.Cancel = true; };
         Closed += delegate { closed = true; timer.Stop(); media.Close(); };
@@ -326,6 +333,7 @@ sealed class SceneEditor : Window {
         position.IsEnabled = start.IsEnabled = end.IsEnabled = play.IsEnabled = stop.IsEnabled =
             markStart.IsEnabled = markEnd.IsEnabled = save.IsEnabled = ready && !Busy;
         recycle.IsEnabled = !Busy && IsManagedVideo() && File.Exists(source);
+        fileName.IsEnabled=ready&&!Busy;
         trimInfo.Text = String.Format("Inicio {0:F2} s  ·  Final {1:F2} s  ·  Recorte {2:F2} s", start.Value, end.Value, end.Value - start.Value);
     }
 
@@ -334,7 +342,7 @@ sealed class SceneEditor : Window {
         Pause(); exporting = true; UpdateControls(); status.Text = "Exportando el recorte…";
         try {
             double first = start.Value, last = end.Value;
-            string file = SceneFiles.Output(outputFolder, "Recorte", ".mp4");
+            string file=CaptureFiles.AvailableOutput(outputFolder,fileName.Text,".mp4","Recorte_"+DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss"));
             await Task.Run(() => SceneFiles.Trim(source, file, first, last));
             status.Text = "Guardado en " + file;
         } catch (Exception ex) { status.Text = "No se pudo guardar: " + ex.GetBaseException().Message; }

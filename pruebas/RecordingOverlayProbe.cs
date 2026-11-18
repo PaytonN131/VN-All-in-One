@@ -45,7 +45,7 @@ static class RecordingOverlayProbe {
                 var wait = Stopwatch.StartNew();
                 while (!status.Text.StartsWith("Filtro aplicado") && wait.ElapsedMilliseconds < 5000) Pump(50);
                 if (!status.Text.StartsWith("Filtro aplicado")) throw new Exception(status.Text);
-                ((Button)ui.FindName("Borderless")).RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
                 Pump(400);
                 overlay = (Overlay)Field(controls, "overlay");
                 var capture = Field(controls, "gpuCapture");

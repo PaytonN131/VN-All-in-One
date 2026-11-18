@@ -14,9 +14,9 @@ using System.Windows.Threading;
 using SD = System.Drawing;
 using WF = System.Windows.Forms;
 
-[assembly: System.Reflection.AssemblyTitle("Nitidez VN 4.1")]
-[assembly: System.Reflection.AssemblyVersion("4.1.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("4.1.0.0")]
+[assembly: System.Reflection.AssemblyTitle("Nitidez VN 4.2")]
+[assembly: System.Reflection.AssemblyVersion("4.2.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("4.2.0.0")]
 
 static class Native {
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L,T,R,B; }
@@ -178,16 +178,16 @@ class Overlay : WF.Form {
 class Choice {public IntPtr H; public uint Pid; public string Title; public string GameName; public override string ToString(){return Title;}}
 
 class ControlWindow : Window {
-    ComboBox windows,fps,preset,captureQuality,windowMode;
+    ComboBox windows,fps,preset,captureQuality;
     readonly ShortcutCatalog shortcuts; readonly ShortcutBinding filterKey,closeKey;
     Slider amount,brightness,contrast,saturation,warmth,gamma;
     TextBlock status,hotkeyStatus,effectState,metrics;
-    Button toggle,borderlessButton;
+    Button toggle;
     bool applyingPreset;
     readonly LunaWindows luna=new LunaWindows();
     readonly AudioClips audioClips;
     readonly SceneControls sceneControls;
-    readonly BorderlessWindow borderless=new BorderlessWindow();
+
     readonly DispatcherTimer restoreTargetTimer=new DispatcherTimer(DispatcherPriority.Background);
     string rememberedExe="",rememberedTitle="",rememberedGame="";
     TextBox gameName;
@@ -204,7 +204,7 @@ class ControlWindow : Window {
     SD.Rectangle displayBounds;
     string logPath=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"sesion.log");
     public ControlWindow() {
-        Title="Nitidez VN 4.1 — controles"; Width=Math.Min(1080,SystemParameters.WorkArea.Width-35); Height=Math.Min(860,SystemParameters.WorkArea.Height-35);MinWidth=880;MinHeight=620;Background=new SolidColorBrush(Color.FromRgb(33,29,38));Foreground=Brushes.White;FontFamily=new FontFamily("Segoe UI");FontSize=13;WindowStartupLocation=WindowStartupLocation.CenterScreen;
+        Title="Nitidez VN 4.2 — controles"; Width=Math.Min(1080,SystemParameters.WorkArea.Width-35); Height=Math.Min(860,SystemParameters.WorkArea.Height-35);MinWidth=880;MinHeight=620;Background=new SolidColorBrush(Color.FromRgb(33,29,38));Foreground=Brushes.White;FontFamily=new FontFamily("Segoe UI");FontSize=13;WindowStartupLocation=WindowStartupLocation.CenterScreen;
         using(var x=System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("Interfaz.xaml"))ui=(FrameworkElement)System.Windows.Markup.XamlReader.Load(x);Content=ui;
         var sections=(TabControl)ui.FindName("Sections");
         sections.SelectionChanged+=delegate(object sender,SelectionChangedEventArgs e){if(e.OriginalSource==sections)Dispatcher.BeginInvoke(new Action(delegate{var scroll=sections.Template.FindName("PanelScroller",sections) as ScrollViewer;if(scroll!=null)scroll.ScrollToTop();}),DispatcherPriority.Loaded);};
@@ -213,7 +213,7 @@ class ControlWindow : Window {
         status=(TextBlock)ui.FindName("Status");hotkeyStatus=(TextBlock)ui.FindName("HotkeyStatus");effectState=(TextBlock)ui.FindName("EffectState");toggle=(Button)ui.FindName("Toggle");
         metrics=(TextBlock)ui.FindName("CaptureMetrics");
         var refresh=(Button)ui.FindName("Refresh");var start=(Button)ui.FindName("Start");var diag=(Button)ui.FindName("Diagnostic");
-        captureQuality=(ComboBox)ui.FindName("CaptureQuality");borderlessButton=(Button)ui.FindName("Borderless");
+        captureQuality=(ComboBox)ui.FindName("CaptureQuality");
         foreach(string quality in new[]{"GPU · 540p","GPU · 720p","GPU · Nativa","Escritorio · Compatibilidad"})captureQuality.Items.Add(quality);
         captureQuality.SelectedIndex=2;
         gameName=(TextBox)ui.FindName("GameName");
@@ -221,7 +221,7 @@ class ControlWindow : Window {
         gameName.TextChanged+=delegate{var choice=windows.SelectedItem as Choice;if(choice!=null){choice.GameName=CaptureFiles.Name(gameName.Text);if(target!=null&&target.H==choice.H&&target.Pid==choice.Pid){target.GameName=choice.GameName;rememberedGame=choice.GameName;}}};
         foreach(int n in new[]{10,15,20,30,60})fps.Items.Add(n);fps.SelectedItem=30;
         shortcuts=new ShortcutCatalog(ui);filterKey=shortcuts.Add(ui,"Key","Alternar filtro",0x77,3,"Ctrl + Alt + F8");closeKey=shortcuts.Add(ui,"CloseKey","Cerrar Nitidez",0x79,3,"Ctrl + Alt + F10");
-        windowMode=(ComboBox)ui.FindName("WindowMode"); ((Button)ui.FindName("ResetKeys")).Click+=delegate{shortcuts.Reset();};
+        ((Button)ui.FindName("ResetKeys")).Click+=delegate{shortcuts.Reset();};
         foreach(string s in new[]{"Natural","Noche suave","Luminoso","Colores vivos","Cálido","Blanco y negro","Personalizado"})preset.Items.Add(s);preset.SelectedIndex=0;
         string pic=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"assets","NitidezVN.ico");if(File.Exists(pic)){var frames=BitmapDecoder.Create(new Uri(pic),BitmapCreateOptions.PreservePixelFormat,BitmapCacheOption.OnLoad).Frames;BitmapFrame best=frames[0];foreach(var frame in frames)if(frame.PixelWidth>best.PixelWidth)best=frame;((Image)ui.FindName("Mascot")).Source=best;}
         string ico=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"assets","NitidezVN.ico");if(File.Exists(ico))Icon=BitmapFrame.Create(new Uri(ico));
@@ -234,7 +234,7 @@ class ControlWindow : Window {
         LoadSettings();UpdateFilters();
         restoreTargetTimer.Interval=TimeSpan.FromSeconds(1);
         restoreTargetTimer.Tick+=delegate{RestoreTarget();};
-        borderlessButton.Click+=delegate{ToggleBorderless();};
+
         captureQuality.SelectionChanged+=delegate{ReleaseFrame();if(target!=null)Tick();};
         fps.SelectionChanged+=delegate{if(timer!=null)timer.Interval=TimeSpan.FromMilliseconds(1000.0/(int)fps.SelectedItem);};
         filterKey.Changed+=delegate{if(hwnd!=IntPtr.Zero)RegisterToggle();};
@@ -257,13 +257,13 @@ class ControlWindow : Window {
         Loaded+=delegate {
             try{CaptureFiles.Initialize();}catch(Exception ex){Log("Carpetas de archivos: "+ex.Message);}
             RefreshWindows();
-            Log("Inicio v4.1 (captura preparada y MP4 compacto). Windows="+Environment.OSVersion+" GPU WPF tier="+(RenderCapability.Tier>>16));
+            Log("Inicio v4.2 (captura preparada y MP4 compacto). Windows="+Environment.OSVersion+" GPU WPF tier="+(RenderCapability.Tier>>16));
             if(rememberedExe.Length!=0){restoreTargetTimer.Start();RestoreTarget();}
             Dispatcher.BeginInvoke(new Action(SaveUiPreview),DispatcherPriority.ApplicationIdle);
         };
         Closing+=delegate(object sender,System.ComponentModel.CancelEventArgs e){
             if(!sceneControls.CanClose()||!audioClips.CanClose()){e.Cancel=true;return;}
-            try{borderless.Restore();}catch(Exception ex){Log("Restaurar ventana al cerrar: "+ex.Message);}
+
             closing=true;restoreTargetTimer.Stop();SaveSettings();sceneControls.Dispose();audioClips.Dispose();if(timer!=null)timer.Stop();Native.UnregisterHotKey(hwnd,1);Native.UnregisterHotKey(hwnd,2);ReleaseFrame();if(overlay!=null)overlay.Close();Log("Cierre; recursos liberados.");
         };
     }
@@ -353,7 +353,7 @@ class ControlWindow : Window {
     }
     void SelectTarget(bool automatic=false){var c=windows.SelectedItem as Choice;if(c==null){status.Text="Selecciona una ventana.";return;}try{
         c.GameName=CaptureFiles.Name(gameName.Text);
-        if(target==null||target.H!=c.H||target.Pid!=c.Pid){borderless.Restore();ReleaseFrame();}
+        if(target==null||target.H!=c.H||target.Pid!=c.Pid){ReleaseFrame();}
         audioClips.Select(c);sceneControls.Select(c);
         if(overlay==null){if((RenderCapability.Tier>>16)<2)throw new Exception("WPF no ofrece aceleración GPU de nivel 2 en esta sesión.");shader=new Sharpen();UpdateFilters();overlay=new Overlay();overlay.Image.Effect=shader;overlay.Show();overlay.Hide();}
         target=c;restoreTargetTimer.Stop();
@@ -362,24 +362,8 @@ class ControlWindow : Window {
             catch(ArgumentException){rememberedExe="";}
             rememberedTitle=c.Title;rememberedGame=CaptureFiles.Game(c);SaveSettings();
         }
-        borderlessButton.IsEnabled=true;UpdateBorderlessButton();enabled=true;frames=0;sampleFrames=0;workMs=0;rate.Reset();if(timer==null){timer=new DispatcherTimer(DispatcherPriority.Background);timer.Tick+=delegate{Tick();};}timer.Interval=TimeSpan.FromMilliseconds(1000.0/(int)fps.SelectedItem);timer.Start();Log((automatic?"Reconocida: ":"Seleccionada: ")+c.Title);Tick();
+        enabled=true;frames=0;sampleFrames=0;workMs=0;rate.Reset();if(timer==null){timer=new DispatcherTimer(DispatcherPriority.Background);timer.Tick+=delegate{Tick();};}timer.Interval=TimeSpan.FromMilliseconds(1000.0/(int)fps.SelectedItem);timer.Start();Log((automatic?"Reconocida: ":"Seleccionada: ")+c.Title);Tick();
     }catch(Exception ex){enabled=false;if(overlay!=null)overlay.Hide();status.Text="No se pudo iniciar: "+ex.Message;Log(status.Text);}}
-    void UpdateBorderlessButton(){borderlessButton.Content="Aplicar modo";}
-    void ToggleBorderless() {
-        if(target==null)return;
-        ReleaseFrame();
-        try {
-            if(windowMode.SelectedIndex==0)borderless.Restore();
-            else borderless.Apply(target,windowMode.SelectedIndex);
-            ((TextBlock)ui.FindName("ModeStatus")).Text=windowMode.SelectedIndex==0?"Ventana original restaurada.":"Modo aplicado. Si el juego no se adapta, elige Restaurar original.";
-            Log(borderless.Active?"Modo sin bordes aplicado.":"Geometría del juego restaurada.");
-        } catch(Exception ex) {
-            Log("Modo sin bordes: "+ex.Message);
-            MessageBox.Show(this,ex.Message,"Nitidez VN · Sin bordes");
-        }
-        UpdateBorderlessButton();
-        Tick();
-    }
     void ReleaseGpu(){
         if(gpuCapture==null)return;
         if(overlay!=null)overlay.Image.Source=null;
@@ -394,7 +378,7 @@ class ControlWindow : Window {
     void Pause(string text){if(overlay!=null)overlay.Hide();ReleaseGpu();hasFrame=false;rate.Reset();sampleFrames=0;nextMetrics=0;if(status.Text!=text)status.Text=text;UpdateState(enabled?"EN ESPERA":"DESACTIVADO",false);}
     void Tick(){if(closing||target==null)return;try{
         uint pid;Native.GetWindowThreadProcessId(target.H,out pid);
-        if(!Native.IsWindow(target.H)||pid!=target.Pid){Pause("La ventana seleccionada dejó de estar disponible.");enabled=false;borderless.Restore();borderlessButton.IsEnabled=false;UpdateBorderlessButton();ReleaseFrame();target=null;if(rememberedExe.Length!=0)restoreTargetTimer.Start();return;}
+        if(!Native.IsWindow(target.H)||pid!=target.Pid){Pause("La ventana seleccionada dejó de estar disponible.");enabled=false;ReleaseFrame();target=null;if(rememberedExe.Length!=0)restoreTargetTimer.Start();return;}
         if(!enabled){Pause("Efecto desactivado. El juego sigue mostrando su imagen original.");return;}
         if(Native.IsIconic(target.H)){Pause("Captura pausada: ventana minimizada.");return;}
         luna.Refresh();

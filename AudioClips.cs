@@ -14,9 +14,10 @@ sealed class AudioClip {
     public readonly byte[] Pcm;
     public readonly DateTime Time = DateTime.Now;
     public readonly string Game;
+    public string FileName;
     public int Start, End;
     public AudioClip(byte[] pcm, string game) {
-        Pcm = pcm; Game = game; End = pcm.Length / AudioRing.FrameBytes;
+        Pcm = pcm; Game = game; FileName=CaptureFiles.DefaultName(game); End = pcm.Length / AudioRing.FrameBytes;
     }
     public override string ToString() {
         return String.Format("{0:HH:mm:ss.fff} · {1:F2} s · {2}", Time, (double)Pcm.Length / AudioRing.BytesPerSecond, Game);
@@ -200,6 +201,8 @@ sealed class ClipEditor : Window {
     readonly ObservableCollection<AudioClip> clips;
     readonly ComboBox list = new ComboBox();
     readonly Slider start = new Slider(), end = new Slider();
+    readonly TextBox fileName=new TextBox{IsReadOnly=false,Cursor=System.Windows.Input.Cursors.IBeam,Margin=new Thickness(0,6,0,12)};
+    readonly Button folderButton=new Button{Content="Abrir carpeta"};
     readonly TextBlock startText = new TextBlock(), endText = new TextBlock(), status = new TextBlock { TextWrapping = TextWrapping.Wrap };
     readonly TextBlock playbackTime = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 0, 6) };
     readonly AudioWave wave = new AudioWave { Height = 142, Margin = new Thickness(0, 6, 0, 12), Cursor = Cursors.SizeWE };
@@ -229,8 +232,10 @@ sealed class ClipEditor : Window {
         root.Children.Add(wave);
         root.Children.Add(startText); root.Children.Add(start);
         root.Children.Add(endText); root.Children.Add(end);
+        root.Children.Add(new TextBlock{Text="Nombre del audio (sin .mp3)",Margin=new Thickness(0,12,0,0)});root.Children.Add(fileName);
+        fileName.TextChanged+=delegate{if(!updating&&Current!=null)Current.FileName=fileName.Text;};
         var actions = new WrapPanel { Margin = new Thickness(0,10,0,10) };
-        foreach (var button in new[] { play, stop, save, discard }) {
+        foreach (var button in new[] { play, stop, save, discard, folderButton }) {
             button.Margin = new Thickness(0,0,8,6);
             actions.Children.Add(button);
         }
@@ -247,6 +252,7 @@ sealed class ClipEditor : Window {
         playbackTimer.Tick += delegate { UpdatePlayhead(); };
         save.Click += async delegate { await Save(); };
         discard.Click += delegate { var clip = Current; if (clip != null) clips.Remove(clip); SelectLast(); };
+        folderButton.Click+=delegate{try{CaptureFiles.OpenPath(Current!=null?CaptureFiles.Folder("Grabaciones",Current.Game):LastSaved!=null?Path.GetDirectoryName(LastSaved):Path.Combine(AudioFiles.Folder,"Grabaciones"));}catch(Exception ex){status.Text="No se pudo abrir la carpeta: "+ex.Message;}};
         Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (Exporting) e.Cancel = true; };
         Closed += delegate { Stop(); };
         Deactivated += delegate { Stop(); };
@@ -263,10 +269,12 @@ sealed class ClipEditor : Window {
         var clip = Current;
         updating = true;
         if (clip != null) {
+            fileName.Text=clip.FileName;
             start.Maximum = end.Maximum = (double)clip.Pcm.Length / AudioRing.BytesPerSecond;
             start.Value = (double)clip.Start / AudioRing.Rate; end.Value = (double)clip.End / AudioRing.Rate;
             start.SmallChange = end.SmallChange = .01; start.LargeChange = end.LargeChange = .25;
         }
+        else fileName.Text="";
         updating = false;
         wave.SetClip(clip);
         UpdateControls();
@@ -278,6 +286,7 @@ sealed class ClipEditor : Window {
         wave.IsEnabled = start.IsEnabled;
         stop.IsEnabled = player != null;
         list.IsEnabled = !Exporting;
+        fileName.IsEnabled=clip!=null&&!Exporting;
         startText.Text = clip == null ? "Inicio" : String.Format("Inicio   {0:F2} s", start.Value);
         endText.Text = clip == null ? "Final" : String.Format("Final   {0:F2} s     ·     Selección {1:F2} s", end.Value, end.Value-start.Value);
         if (clip == null && String.IsNullOrEmpty(status.Text)) status.Text = "Captura un clip mientras juegas.";
@@ -344,17 +353,11 @@ sealed class ClipEditor : Window {
         Stop();
         try {
             string folder=CaptureFiles.Folder("Grabaciones",clip.Game);
-            var dialog = new Microsoft.Win32.SaveFileDialog {
-                Title = "Guardar tramo de audio", Filter = "Audio MP3 (*.mp3)|*.mp3",
-                DefaultExt = ".mp3", AddExtension = true, InitialDirectory = folder,
-                FileName = CaptureFiles.Name(clip.Game)+"_" + clip.Time.ToString("yyyy-MM-dd_HH-mm-ss-fff") + ".mp3"
-            };
-            if (dialog.ShowDialog(this) != true) return;
-            if (File.Exists(dialog.FileName)) throw new IOException("Ese archivo ya existe. Elige un nombre nuevo.");
+            string file=CaptureFiles.AvailableOutput(folder,fileName.Text,".mp3",CaptureFiles.DefaultName(clip.Game));
             int first = clip.Start, last = clip.End;
             Exporting = true; UpdateControls(); status.Text = "Exportando MP3…";
-            await Task.Run(() => AudioFiles.Export(clip, first, last, dialog.FileName));
-            LastSaved = dialog.FileName;
+            await Task.Run(() => AudioFiles.Export(clip, first, last, file));
+            LastSaved = file;
             status.Text = "Guardado en " + LastSaved;
             clips.Remove(clip);
             SelectLast();
@@ -401,6 +404,7 @@ sealed class AudioClips : IDisposable {
             else StopCapture();
         };
         edit.Click += delegate { OpenEditor(); };
+        ((Button)ui.FindName("AudioFolder")).Click+=delegate{try{CaptureFiles.OpenFolder("Grabaciones",target);}catch(Exception ex){notice="No se pudo abrir la carpeta: "+ex.Message;}UpdateStatus();};
         ((Button)ui.FindName("AudioRename")).Click+=delegate{
             try{string renamed=CaptureFiles.RenameDialog(owner,ui.Resources,"Grabaciones");if(renamed!=null)notice="Audio renombrado: "+renamed;}
             catch(Exception ex){notice="No se pudo renombrar: "+ex.Message;}UpdateStatus();

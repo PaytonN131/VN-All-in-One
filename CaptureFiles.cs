@@ -5,6 +5,18 @@ using System.Windows;
 using System.Windows.Controls;
 
 static class CaptureFiles {
+    public static string DefaultName(string game){string prefix=Name(game);if(prefix.Length>40)prefix=prefix.Substring(0,40);return prefix+"_"+DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss-fff");}
+    public static string AvailableOutput(string folder,string requested,string extension,string fallback){
+        string name=String.IsNullOrWhiteSpace(requested)?fallback:requested.Trim();
+        if(name.EndsWith(extension,StringComparison.OrdinalIgnoreCase))name=name.Substring(0,name.Length-extension.Length);
+        if(String.IsNullOrWhiteSpace(name)||Name(name)!=name)throw new IOException("Escribe un nombre sin rutas ni caracteres como /, \\, : o *. Máximo 80 caracteres.");
+        Directory.CreateDirectory(folder);
+        string file=Path.Combine(folder,name+extension);
+        for(int i=2;File.Exists(file);i++)file=Path.Combine(folder,name+"_"+i.ToString("D2")+extension);
+        return file;
+    }
+    public static void OpenPath(string folder){Directory.CreateDirectory(folder);System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo{FileName=folder,UseShellExecute=true});}
+    public static void OpenFolder(string category,Choice game){OpenPath(game==null?Path.Combine(AudioFiles.Folder,category):Folder(category,Game(game)));}
     public static void Initialize(){foreach(string category in new[]{"Capturas","Grabaciones","Videos"})Directory.CreateDirectory(Path.Combine(AudioFiles.Folder,category));}
     public static string Name(string value){
         string name=Regex.Replace(value??"","\\s+"," ").Trim();
