@@ -43,7 +43,7 @@ vec4 hook() {{
 }
 
 static class SceneFiles {
-    public const string LosslessEncoding="-c:v h264_nvenc -preset p3 -tune lossless -rc constqp -qp 0 -bf 0 -pix_fmt gbrp -colorspace rgb -c:a alac";
+    public const string CompatibleEncoding="-c:v h264_nvenc -preset p3 -tune ll -bf 0 -rc vbr -cq 18 -b:v 0 -pix_fmt yuv420p -c:a aac -b:a 160k";
     public const long PreferredVideoBytes = 30000000;
     public static readonly string Videos = Path.Combine(AudioFiles.Folder, "Videos");
     public static readonly string Screenshots = Path.Combine(AudioFiles.Folder, "Capturas");
@@ -124,7 +124,7 @@ static class SceneFiles {
 
     public static void Trim(string source, string dest, double start, double end) {
         if(end<=start)throw new IOException("El tramo elegido está vacío.");
-        RunFile("-ss "+Number(start)+" -i "+Quote(source)+" -t "+Number(end-start)+" -map 0:v:0 -map 0:a:0? "+LosslessEncoding+" -fps_mode passthrough -movflags +faststart -f mp4",dest,1800000);
+        RunFile("-ss "+Number(start)+" -i "+Quote(source)+" -t "+Number(end-start)+" -map 0:v:0 -map 0:a:0? "+CompatibleEncoding+" -fps_mode passthrough -movflags +faststart -f mp4",dest,1800000);
     }
     public static void Preview(string source,string dest,CancellationToken cancellation){
         RunFile("-i "+Quote(source)+" -map 0:v:0 -map 0:a:0? -vf "+Quote("scale=-2:'min(ih,540)'")+" -c:v libx264 -preset ultrafast -crf 26 -pix_fmt yuv420p -threads:v 2 -c:a aac -b:a 96k -movflags +faststart -f mp4",dest,1800000,cancellation);

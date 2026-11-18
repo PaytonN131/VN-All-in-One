@@ -36,7 +36,7 @@ sealed class SceneControls : IDisposable {
         this.audioClips = audioClips;
         status = (TextBlock)ui.FindName("SceneStatus"); keys = (TextBlock)ui.FindName("SceneKeys");
         resolution = (ComboBox)ui.FindName("SceneResolution");
-        resolution.Items.Add("Original (sin reducir)");resolution.Items.Add("1080p"); resolution.Items.Add("720p"); resolution.SelectedIndex = 0;
+        resolution.Items.Add("1080p"); resolution.Items.Add("720p"); resolution.SelectedIndex = 0;
         videoFps = (ComboBox)ui.FindName("SceneFps");
         videoFps.Items.Add("60 FPS"); videoFps.Items.Add("30 FPS"); videoFps.SelectedIndex = 0;
         record = (Button)ui.FindName("SceneRecord"); screenshot = (Button)ui.FindName("SceneScreenshot"); edit = (Button)ui.FindName("SceneEdit");
@@ -67,7 +67,7 @@ sealed class SceneControls : IDisposable {
     public void Load(System.Xml.XmlElement node) {
         for(int i=0;i<3;i++)shortcuts[i].Load(node,"atajoEscena"+i);
         UpdateKeyLabels();
-        resolution.SelectedIndex=node.GetAttribute("clipsResolucion")=="720p"?2:node.GetAttribute("clipsResolucion")=="1080p"?1:0;
+        resolution.SelectedIndex=node.GetAttribute("clipsResolucion")=="720p"?1:0;
         videoFps.SelectedIndex = node.GetAttribute("clipsFps") == "30" ? 1 : 0;
     }
     public void Save(System.Xml.XmlWriter writer) {
@@ -154,7 +154,7 @@ sealed class SceneControls : IDisposable {
     async void Start() {
         if (recording != null || !Valid()||prepared==null||!prepared.Ready) return;
         try {
-            int limit = resolution.SelectedIndex==0?0:resolution.SelectedIndex==2?720:1080;
+            int limit = resolution.SelectedIndex==1?720:1080;
             int fps = videoFps.SelectedIndex == 1 ? 30 : 60;
             string game=CaptureFiles.Game(target);
             string path = SceneFiles.Output(CaptureFiles.Folder("Videos",game), game, ".mp4");
@@ -293,6 +293,7 @@ sealed class SceneEditor : Window {
             Pause(); Seek(0); UpdateControls();
         };
         media.MediaFailed += delegate(object sender, ExceptionRoutedEventArgs e) {
+            if(previewPath==null&&!preparingPreview){LoadFallbackPreview();return;}
             ready = false; Pause(); status.Text = "No se pudo reproducir el clip: " + e.ErrorException.Message; UpdateControls();
         };
         media.MediaEnded += delegate { Pause(); Seek(end.Value); };
@@ -310,9 +311,10 @@ sealed class SceneEditor : Window {
         Closed += delegate { closed = true; previewCancellation.Cancel();timer.Stop(); media.Close();DeletePreview(); };
         Deactivated += delegate { Pause(); };
         UpdateControls();
-        Loaded+=async delegate{await LoadPreview();};
+        media.Source=new Uri(source);media.Play();
     }
 
+    async void LoadFallbackPreview(){await LoadPreview();}
     void DeletePreview(){try{if(previewPath!=null&&File.Exists(previewPath))File.Delete(previewPath);}catch(IOException){}}
     async Task LoadPreview(){
         preparingPreview=true;UpdateControls();status.Text="Preparando vista previa… El clip original conserva su calidad.";

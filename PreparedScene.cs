@@ -16,8 +16,7 @@ sealed class SceneFrame {
 sealed class PreparedScene : IDisposable {
     sealed class PhotoRequest {
         public SceneLook Look;
-        public WindowCapture Capture;
-        public readonly Stopwatch Clock=Stopwatch.StartNew();
+        public WindowCapture Capture; public readonly Stopwatch Clock=Stopwatch.StartNew();
         public readonly TaskCompletionSource<SceneFrame> Result=new TaskCompletionSource<SceneFrame>();
     }
     readonly Choice target;
@@ -45,9 +44,9 @@ sealed class PreparedScene : IDisposable {
             if(recording!=null)throw new IOException("Ya hay una grabación.");
             var area=BorderlessWindow.ClientBounds(target.H);
             if(area.Width<2||area.Height<2)throw new IOException("El área del juego está vacía.");
-            double scale=limit==0?1:Math.Min(1,Math.Min(limit/(double)area.Height,limit*16.0/9/area.Width));
-            recording=new FastSceneRecording(audio,look,output,limit==0?area.Width:Math.Max(2,(int)(area.Width*scale)&~1),
-                limit==0?area.Height:Math.Max(2,(int)(area.Height*scale)&~1),fps);
+            double scale=Math.Min(1,Math.Min(limit/(double)area.Height,limit*16.0/9/area.Width));
+            recording=new FastSceneRecording(audio,look,output,Math.Max(2,(int)(area.Width*scale)&~1),
+                Math.Max(2,(int)(area.Height*scale)&~1),fps,limit);
             wake.Set();return recording;
         }
     }
@@ -61,30 +60,27 @@ sealed class PreparedScene : IDisposable {
         return capture.Snapshot(area,data,width,height,look.NativeFilter)?new SceneFrame{Pixels=data,Width=width,Height=height}:null;
     }
     void Run() {
-        Exception failure=null;
-        PhotoRequest pending=null;
+        Exception failure=null; PhotoRequest pending=null;
         try {
             using(var capture=new WindowCapture(target.H)) {
                 var neutral=new SceneLook(0,0,1,1,0,1);
                 var startup=Stopwatch.StartNew();
                 while(!closing&&!Ready){
-                    Ready=Frame(capture,neutral,2,2)!=null;
+                    var area=BorderlessWindow.ClientBounds(target.H);double scale=Math.Min(1,Math.Min(1080.0/area.Height,1920.0/area.Width));
+                    Ready=Frame(capture,neutral,Math.Max(2,(int)(area.Width*scale)&~1),Math.Max(2,(int)(area.Height*scale)&~1))!=null;
                     if(!Ready&&startup.ElapsedMilliseconds>5000)throw new IOException("La ventana no entregó el primer fotograma.");
                     if(!Ready)wake.WaitOne(10);
                 }
                 while(!closing) {
                     PhotoRequest request;
                     if(pending==null&&photos.TryDequeue(out request))pending=request;
-                    if(pending!=null) {
-                        try {
-                            // A new session can only supply frames obtained after this request.
-                            // Do not use the recording session's cached texture for photographs.
+                    if(pending!=null){
+                        try{
                             if(pending.Capture==null)pending.Capture=new WindowCapture(target.H);
                             var frame=Frame(pending.Capture,pending.Look,0,0);
                             if(frame!=null){pending.Result.SetResult(frame);pending.Capture.Dispose();pending=null;}
                             else if(pending.Clock.ElapsedMilliseconds>2000)throw new IOException("No llegó una imagen nueva. No se guardó una captura anterior.");
-                        }
-                        catch(Exception ex){pending.Result.TrySetException(ex);if(pending.Capture!=null)pending.Capture.Dispose();pending=null;}
+                        }catch(Exception ex){pending.Result.TrySetException(ex);if(pending.Capture!=null)pending.Capture.Dispose();pending=null;}
                     }
                     FastSceneRecording active;
                     lock(gate)active=recording;
@@ -97,14 +93,14 @@ sealed class PreparedScene : IDisposable {
                             if(frame!=null)active.Add(frame.Pixels);
                         }
                     }
-                    else capture.Pump(BorderlessWindow.ClientBounds(target.H));
+                    if(active==null)capture.Pump(BorderlessWindow.ClientBounds(target.H));
                     wake.WaitOne(active==null&&pending==null?16:1);
                 }
             }
         }catch(Exception ex){failure=ex;Error=ex.Message;}
         finally {
-            if(pending!=null){if(pending.Capture!=null)pending.Capture.Dispose();pending.Result.TrySetException(failure??new IOException("Captura cerrada."));}
             Ready=false;
+            if(pending!=null){if(pending.Capture!=null)pending.Capture.Dispose();pending.Result.TrySetException(failure??new IOException("Captura cerrada."));}
             lock(gate)if(recording!=null){recording.Fail(failure??new IOException("Captura cerrada."));recording.Complete();}
             PhotoRequest request;
             while(photos.TryDequeue(out request))request.Result.TrySetException(failure??new IOException("Captura cerrada."));
@@ -116,8 +112,9 @@ sealed class PreparedScene : IDisposable {
 sealed class FastSceneRecording {
     readonly GameAudio audio;
     readonly string output;
-    readonly int fps;
+    readonly int fps,bitrate;
     readonly BlockingCollection<byte[]> frames=new BlockingCollection<byte[]>(48),samples=new BlockingCollection<byte[]>(256);
+    readonly ManualResetEventSlim firstFrame=new ManualResetEventSlim(false);
     readonly ConcurrentBag<byte[]> buffers=new ConcurrentBag<byte[]>();
     readonly object audioGate=new object();
     readonly Stopwatch clock=Stopwatch.StartNew();
@@ -126,6 +123,8 @@ sealed class FastSceneRecording {
     volatile bool completed;
     volatile Exception failure;
     int count;
+    long firstFrameTicks;
+    public double FirstFrameMilliseconds {get{return Interlocked.Read(ref firstFrameTicks)*1000.0/Stopwatch.Frequency;}}
     public readonly int Width,Height;
     public readonly SceneLook Look;
     public readonly Task<string> Result;
@@ -135,8 +134,8 @@ sealed class FastSceneRecording {
     public bool FrameDue { get {return clock.Elapsed.TotalSeconds*fps>=count;} }
     public byte[] TakeBuffer(){byte[] data;return buffers.TryTake(out data)?data:new byte[checked(Width*Height*4)];}
     public TimeSpan RecordedElapsed { get {return clock.Elapsed;} }
-    public FastSceneRecording(GameAudio audio,SceneLook look,string output,int width,int height,int fps) {
-        this.audio=audio;Look=look;this.output=output;Width=width;Height=height;this.fps=fps;
+    public FastSceneRecording(GameAudio audio,SceneLook look,string output,int width,int height,int fps,int limit=1080) {
+        this.audio=audio;Look=look;this.output=output;Width=width;Height=height;this.fps=fps;bitrate=fps==60?(limit==720?6:10):(limit==720?4:7);
         receive=delegate(IntPtr input,int length) {
             lock(audioGate) {
                 if(completed)return;
@@ -146,18 +145,18 @@ sealed class FastSceneRecording {
             }
         };
         audio.Packet+=receive;
-        Result=Task.Run(()=>Encode());
+        Result=Task.Run(()=>{if(!firstFrame.Wait(3000)){Fail(new IOException("La ventana no entregó el primer fotograma."));Complete();throw failure;}return Encode();});
     }
     public void Add(byte[] data) {
         lock(audioGate){
             if(completed)return;
             if(!frames.TryAdd(data))Fail(new IOException("El equipo no mantiene esta calidad. Prueba 720p o 30 FPS."));
-            else count++;
+            else {if(count==0)Interlocked.Exchange(ref firstFrameTicks,clock.ElapsedTicks);count++;firstFrame.Set();}
         }
         if(clock.Elapsed.TotalMinutes>=30)Stop();
     }
-    public void Stop(){stopping=true;}
-    public void Fail(Exception ex){failure=ex;stopping=true;}
+    public void Stop(){stopping=true;firstFrame.Set();}
+    public void Fail(Exception ex){failure=ex;stopping=true;firstFrame.Set();}
     public void Complete() {
         audio.Packet-=receive;
         lock(audioGate) {
@@ -172,8 +171,8 @@ sealed class FastSceneRecording {
             using(var pipe=new NamedPipeServerStream(name,PipeDirection.Out,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous,0,32768))
             using(var process=SceneFiles.Start("-nofind_stream_info -thread_queue_size 4 -f rawvideo -pixel_format bgra -video_size "+
                 Width+"x"+Height+" -framerate "+fps+" -i pipe:0 -nofind_stream_info -thread_queue_size 16 -f s16le -ar 44100 -ac 2 -i "+
-                SceneFiles.Quote(@"\\.\pipe\"+name)+" -map 0:v:0 -map 1:a:0 "+SceneFiles.LosslessEncoding+
-                " -shortest -movflags +faststart -f mp4 "+SceneFiles.Quote(temp),true)) {
+                SceneFiles.Quote(@"\\.\pipe\"+name)+" -map 0:v:0 -map 1:a:0 -c:v h264_nvenc -preset p3 -tune ll -bf 0 -g "+fps*2+" -surfaces 6 -zerolatency 1"+
+                " -rc cbr -b:v "+bitrate+"M -maxrate "+bitrate+"M -bufsize "+bitrate+"M -pix_fmt yuv420p -c:a aac -b:a 160k -shortest -movflags +faststart -f mp4 "+SceneFiles.Quote(temp),true)) {
                 var errors=process.StandardError.ReadToEndAsync();process.BeginOutputReadLine();
                 var connected=pipe.WaitForConnectionAsync();
                 var video=Task.Run(delegate {
