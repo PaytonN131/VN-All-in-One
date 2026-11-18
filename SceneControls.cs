@@ -44,10 +44,10 @@ sealed class SceneControls : IDisposable {
         record.Click += delegate { if (recording != null) Stop(); else Start(); };
         screenshot.Click += delegate { Screenshot(); };
         edit.Click += delegate { Edit(); };
-        ((Button)ui.FindName("VideoFolder")).Click+=delegate{try{CaptureFiles.OpenFolder("Videos",target);}catch(Exception ex){notice="No se pudo abrir la carpeta: "+ex.Message;}Refresh();};
+        ((Button)ui.FindName("VideoFolder")).Click+=delegate{try{CaptureFiles.OpenFolder("Clips",target);}catch(Exception ex){notice="No se pudo abrir la carpeta: "+ex.Message;}Refresh();};
         ((Button)ui.FindName("ScreenshotFolder")).Click+=delegate{try{CaptureFiles.OpenFolder("Capturas",target);}catch(Exception ex){notice="No se pudo abrir la carpeta: "+ex.Message;}Refresh();};
         ((Button)ui.FindName("SceneRename")).Click+=delegate{
-            try{string renamed=CaptureFiles.RenameDialog(owner,ui.Resources,"Videos");if(renamed!=null){lastVideo=renamed;notice="Clip renombrado: "+renamed;}}
+            try{string renamed=CaptureFiles.RenameDialog(owner,ui.Resources,"Clips");if(renamed!=null){lastVideo=renamed;notice="Clip renombrado: "+renamed;}}
             catch(Exception ex){notice="No se pudo renombrar: "+ex.Message;}Refresh();
         };
         string[] controls={"VideoStartKey","VideoStopKey","ScreenshotKey"};
@@ -160,7 +160,7 @@ sealed class SceneControls : IDisposable {
             int limit = resolution.SelectedIndex==0?0:resolution.SelectedIndex==2?720:1080;
             int fps = videoFps.SelectedIndex == 1 ? 30 : 60;
             string game=CaptureFiles.Game(target);
-            string path = SceneFiles.Output(CaptureFiles.Folder("Videos",game), game, ".mp4");
+            string path = SceneFiles.Output(CaptureFiles.Folder("Clips",game), game, ".mp4");
             SceneLook recordingLook = look();
             readyCuePlayed = false;
             recording = prepared.Start(audioClips.AcquireVideoAudio(),recordingLook,path,limit,fps);
@@ -199,9 +199,9 @@ sealed class SceneControls : IDisposable {
     void Edit() {
         if (editor != null) { editor.Activate(); return; }
         try {
-            Directory.CreateDirectory(SceneFiles.Videos);
+            Directory.CreateDirectory(SceneFiles.Clips);
             var file = new Microsoft.Win32.OpenFileDialog { Title = "Abrir clip para recortar",
-                Filter = "Clip MP4 (*.mp4)|*.mp4", InitialDirectory = File.Exists(lastVideo)?Path.GetDirectoryName(lastVideo):SceneFiles.Videos,
+                Filter = "Clip MP4 (*.mp4)|*.mp4", InitialDirectory = File.Exists(lastVideo)?Path.GetDirectoryName(lastVideo):SceneFiles.Clips,
                 FileName = File.Exists(lastVideo) ? Path.GetFileName(lastVideo) : "" };
             if (file.ShowDialog(owner) != true) return;
             editor = new SceneEditor(owner, ui.Resources, file.FileName,target==null?null:CaptureFiles.Game(target));
@@ -244,7 +244,7 @@ sealed class SceneEditor : Window {
     readonly Button play = new Button { Content = "▶", ToolTip = "Reproducir tramo", FontSize = 18 },
         stop = new Button { Content = "■", ToolTip = "Detener", FontSize = 18 },
         save = new Button { Content = "Guardar recorte MP4" },
-        recycle = new Button { Content = "Enviar a la Papelera", ToolTip = "Quita de Videos el MP4 abierto" },
+        recycle = new Button { Content = "Enviar a la Papelera", ToolTip = "Quita de Clips el MP4 abierto" },
         markStart = new Button { Content = "Marcar inicio aquí" },
         markEnd = new Button { Content = "Marcar final aquí" };
     readonly DispatcherTimer timer;
@@ -257,18 +257,19 @@ sealed class SceneEditor : Window {
 
     public SceneEditor(Window owner, ResourceDictionary style, string source,string game=null) {
         Owner = owner; this.source = source; Resources.MergedDictionaries.Add(style);
-        outputFolder=CaptureFiles.Inside(source,SceneFiles.Videos)?Path.GetDirectoryName(source):CaptureFiles.Folder("Videos",game??"Otros");
-        Title = "Nitidez VN · Editar clip"; Width = Math.Min(1120,SystemParameters.WorkArea.Width-30);
-        Height = Math.Min(860, SystemParameters.WorkArea.Height - 25);
+        outputFolder=CaptureFiles.Inside(source,SceneFiles.Clips)?Path.GetDirectoryName(source):CaptureFiles.Folder("Clips",game??"Otros");
+        Title = "Nitidez VN · Editar clip"; Width = Math.Min(1880,SystemParameters.WorkArea.Width-30);
+        Height = Math.Min(1020, SystemParameters.WorkArea.Height - 25);
         MinWidth = 940; MinHeight = 680; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = new SolidColorBrush(Color.FromRgb(33,29,38)); Foreground = Brushes.White;
-        StackPanel main,side;EditorLayout.Shell(this,"Editar clip",Path.GetFileName(source),out main,out side);
-        var preview=EditorLayout.Card(main,"1. Busca el momento");preview.Children.Add(new Border{Background=Brushes.Black,Height=200,Child=media,CornerRadius=new CornerRadius(6),Margin=new Thickness(0,0,0,12)});
-        preview.Children.Add(EditorLayout.Note("Mueve la barra para buscar el inicio o el final de la escena."));preview.Children.Add(position);preview.Children.Add(positionTime);
-        play.Content="▶ Ver selección";stop.Content="■ Detener";EditorLayout.Buttons(preview,play,stop);
-        var trim=EditorLayout.Card(main,"2. Elige qué conservar");
-        EditorLayout.Range(trim,new TextBlock{Text="Inicio"},start,new TextBlock{Text="Final"},end,markStart,markEnd);trimInfo.Margin=new Thickness(0,12,0,0);trimInfo.TextWrapping=TextWrapping.Wrap;trim.Children.Add(trimInfo);
-        var output=EditorLayout.Card(side,"3. Guarda el recorte");output.Children.Add(EditorLayout.Note("Nombre del nuevo archivo, sin .mp4. El clip original se conserva."));fileName.Text="Recorte_"+DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");output.Children.Add(fileName);EditorLayout.SaveButton(save);output.Children.Add(save);folderButton.Margin=new Thickness(0,0,0,14);output.Children.Add(folderButton);output.Children.Add(EditorLayout.Note("Se guarda en la carpeta del juego, sin límite de peso."));
+        Grid main;StackPanel side;EditorLayout.ClipShell(this,"Editar clip",Path.GetFileName(source),out main,out side);
+        media.SnapsToDevicePixels=true;media.UseLayoutRounding=true;
+        var preview=new Border{Background=Brushes.Black,Child=media,CornerRadius=new CornerRadius(8),Margin=new Thickness(0,0,0,12)};main.Children.Add(preview);
+        var transport=new StackPanel();Grid.SetRow(transport,1);main.Children.Add(transport);
+        transport.Children.Add(position);transport.Children.Add(positionTime);play.Content="▶ Ver selección";stop.Content="■ Detener";EditorLayout.Buttons(transport,play,stop);
+        var trim=EditorLayout.Card(side,"1. Elige qué conservar");trim.Children.Add(EditorLayout.Note("Busca el momento en la vista previa y marca el inicio y el final."));
+        trim.Children.Add(new TextBlock{Text="Inicio"});trim.Children.Add(start);markStart.Margin=new Thickness(0,4,0,14);trim.Children.Add(markStart);
+        trim.Children.Add(new TextBlock{Text="Final"});trim.Children.Add(end);markEnd.Margin=new Thickness(0,4,0,8);trim.Children.Add(markEnd);trimInfo.Margin=new Thickness(0,8,0,0);trimInfo.TextWrapping=TextWrapping.Wrap;trim.Children.Add(trimInfo);        var output=EditorLayout.Card(side,"2. Guarda el recorte");output.Children.Add(EditorLayout.Note("Nombre del nuevo archivo, sin .mp4. El clip original se conserva."));fileName.Text="Recorte_"+DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");output.Children.Add(fileName);EditorLayout.SaveButton(save);output.Children.Add(save);folderButton.Margin=new Thickness(0,0,0,14);output.Children.Add(folderButton);output.Children.Add(EditorLayout.Note("Se guarda en la carpeta del juego, sin límite de peso."));
         var message=EditorLayout.Card(side,"Estado");message.Children.Add(status);
         recycle.Content="Enviar original a la Papelera";recycle.Margin=new Thickness(0,0,0,10);side.Children.Add(recycle);
         side.Children.Add(EditorLayout.Note("Esta opción retira el clip que abriste. Guardar un recorte crea otro archivo."));
@@ -287,6 +288,7 @@ sealed class SceneEditor : Window {
             start.Maximum = end.Maximum = position.Maximum = duration;
             end.Value = duration; start.Value = 0;
             updating = false; ready = duration > 0;
+            var dpi=VisualTreeHelper.GetDpi(this);media.MaxWidth=media.NaturalVideoWidth/dpi.DpiScaleX;media.MaxHeight=media.NaturalVideoHeight/dpi.DpiScaleY;
             Pause(); Seek(0); UpdateControls();
         };
         media.MediaFailed += delegate(object sender, ExceptionRoutedEventArgs e) {
@@ -364,7 +366,7 @@ sealed class SceneEditor : Window {
     }
 
     bool IsManagedVideo() {
-        return CaptureFiles.Inside(source,SceneFiles.Videos);
+        return CaptureFiles.Inside(source,SceneFiles.Clips);
     }
 
     async Task RecycleVideo() {

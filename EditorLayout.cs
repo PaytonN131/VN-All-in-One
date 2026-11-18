@@ -21,6 +21,14 @@ static class EditorLayout {
         var left=new ScrollViewer{Content=main,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};Grid.SetRow(left,1);root.Children.Add(left);
         var right=new ScrollViewer{Content=side,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};Grid.SetRow(right,1);Grid.SetColumn(right,2);root.Children.Add(right);window.Content=root;
     }
+    public static void ClipShell(Window window,string heading,string instruction,out Grid main,out StackPanel side){
+        window.FontFamily=new FontFamily("Segoe UI");window.FontSize=13;
+        var root=new Grid{Margin=new Thickness(20),Background=window.Background};root.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});root.RowDefinitions.Add(new RowDefinition());
+        root.ColumnDefinitions.Add(new ColumnDefinition());root.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(20)});root.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(328)});
+        var title=new StackPanel();title.Children.Add(new TextBlock{Text=heading,FontSize=25,FontWeight=FontWeights.SemiBold,Margin=new Thickness(0,0,0,4)});title.Children.Add(Note(instruction));Grid.SetColumnSpan(title,3);root.Children.Add(title);
+        main=new Grid();main.RowDefinitions.Add(new RowDefinition());main.RowDefinitions.Add(new RowDefinition{Height=GridLength.Auto});Grid.SetRow(main,1);root.Children.Add(main);
+        side=new StackPanel();var right=new ScrollViewer{Content=side,VerticalScrollBarVisibility=ScrollBarVisibility.Auto,HorizontalScrollBarVisibility=ScrollBarVisibility.Disabled};Grid.SetRow(right,1);Grid.SetColumn(right,2);root.Children.Add(right);window.Content=root;
+    }
     public static void Range(StackPanel parent,TextBlock firstLabel,Slider first,TextBlock lastLabel,Slider last,Button markFirst=null,Button markLast=null){
         var row=new Grid();row.ColumnDefinitions.Add(new ColumnDefinition());row.ColumnDefinitions.Add(new ColumnDefinition{Width=new GridLength(20)});row.ColumnDefinitions.Add(new ColumnDefinition());
         var left=new StackPanel();left.Children.Add(firstLabel);left.Children.Add(first);if(markFirst!=null){markFirst.Margin=new Thickness(0,8,0,0);left.Children.Add(markFirst);}row.Children.Add(left);
