@@ -1,0 +1,19 @@
+# Archivos locales y resultados de compilación
+/dist/
+/ajustes.xml
+/sesion.log
+/diagnostico/
+*.pdb
+*.obj
+*.lib
+*.exp
+*.dll
+*.exe
+*.rar
+*.zip
+*.part
+*.pendiente
+/pruebas/v*/
+/pruebas/ajustes.xml
+/pruebas/sesion.log
+/pruebas/diagnostico/
