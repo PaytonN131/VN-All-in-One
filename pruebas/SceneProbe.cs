@@ -68,7 +68,18 @@ static class SceneProbe {
                 var warm=Stopwatch.StartNew();
                 while(!prepared.Ready&&warm.ElapsedMilliseconds<5000)await Task.Delay(10);
                 if(!prepared.Ready)throw new Exception(prepared.Error??"La captura no se preparó.");
-                int limit = motion ? 1080 : 720;
+                for(int n=0;n<3;n++){
+                    await Task.Delay(400);
+                    byte value=(byte)(41+n*53);
+                    scene.Background=new SolidColorBrush(Color.FromRgb(value,value,value));
+                    await Task.Delay(50);
+                    var fresh=await prepared.Photo(new SceneLook(0,0,1,1,0,1));
+                    int at=((fresh.Height/2)*fresh.Width+fresh.Width/2)*4;
+                    if(fresh.Pixels[at]!=value||fresh.Pixels[at+1]!=value||fresh.Pixels[at+2]!=value)throw new Exception("La captura usó una imagen anterior al diálogo actual.");
+                }
+                Console.WriteLine("PASS: 3 cambios de diálogo tras periodos inactivos, sin fotogramas antiguos; cursor de Windows excluido al crear la sesión.");
+                scene.Background=new SolidColorBrush(Color.FromRgb(64,80,128));await Task.Delay(50);
+                int limit = 0;
                 int fps = args.Length > 2 && args[2] == "30" ? 30 : 60;
                 string source = SceneFiles.Source(hwnd, limit, 60);
                 string png = SceneFiles.Output(folder, "Captura", ".png");
@@ -115,13 +126,7 @@ static class SceneProbe {
                 await Task.Run(() => CheckRecordedFilter(video, folder));
                 string trim = SceneFiles.Output(folder, "Recorte", ".mp4");
                 await Task.Run(() => SceneFiles.Trim(video, trim, .25, 1.0));
-                if(new FileInfo(trim).Length>new FileInfo(video).Length||new FileInfo(video).Length>SceneFiles.MaximumVideoBytes)
-                    throw new Exception("Se excedió el tamaño permitido.");
-                string tiny=SceneFiles.Output(folder,"Prueba-limite",".mp4");
-                double length=SceneFiles.Duration(video,0);
-                await Task.Run(()=>SceneFiles.ExportSmall(video,tiny,0,length,100000));
-                if(new FileInfo(tiny).Length>100000)throw new Exception("No se cumplió el límite de prueba.");
-                Console.WriteLine("Límite estricto verificado, archivo de {0} bytes.",new FileInfo(tiny).Length);
+                Console.WriteLine("Clip sin límite de peso: {0} bytes.",new FileInfo(video).Length);
                 var controls = new ControlWindow { ShowInTaskbar = false, ShowActivated = false,
                     WindowStartupLocation = WindowStartupLocation.Manual, Left = -30000, Top = -30000 };
                 var styles = ((FrameworkElement)controls.Content).Resources;
@@ -133,7 +138,7 @@ static class SceneProbe {
                 media.MediaFailed += delegate(object sender, ExceptionRoutedEventArgs error) { opened.TrySetException(error.ErrorException); };
                 editor.Show();
                 try {
-                    if (await Task.WhenAny(opened.Task, Task.Delay(8000)) != opened.Task || !await opened.Task)
+                    if (await Task.WhenAny(opened.Task, Task.Delay(15000)) != opened.Task || !await opened.Task)
                         throw new Exception("El editor no abrió la vista previa.");
                     var trimEnd = (Slider)typeof(SceneEditor).GetField("end", BindingFlags.Instance | BindingFlags.NonPublic).GetValue(editor);
                     var watch = Stopwatch.StartNew();

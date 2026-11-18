@@ -16,6 +16,7 @@ sealed class WindowCapture : IDisposable {
         uint width, uint height, ref Filter settings);
     [DllImport("WindowCapture.dll")] static extern void NVClose(IntPtr capture);
     [DllImport("WindowCapture.dll")] static extern int NVSnapshot(IntPtr capture,Native.RECT area,[Out] byte[] pixels,uint width,uint height,ref Filter filter);
+    [DllImport("WindowCapture.dll")] static extern int NVPump(IntPtr capture,Native.RECT area);
     IntPtr session;
 
     public WindowCapture(IntPtr window) { Marshal.ThrowExceptionForHR(NVCreate(window, out session)); }
@@ -44,6 +45,7 @@ sealed class WindowCapture : IDisposable {
         int hr=NVSnapshot(session,rect,pixels,(uint)width,(uint)height,ref settings);
         Marshal.ThrowExceptionForHR(hr);return hr==0;
     }
+    public void Pump(SD.Rectangle area){Marshal.ThrowExceptionForHR(NVPump(session,new Native.RECT{L=area.Left,T=area.Top,R=area.Right,B=area.Bottom}));}
 
     public void Dispose() {
         if (session == IntPtr.Zero) return;

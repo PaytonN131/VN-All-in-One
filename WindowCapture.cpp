@@ -82,7 +82,8 @@ struct WindowFrames {
         poolSize = item.Size();
         pool = Direct3D11CaptureFramePool::CreateFreeThreaded(interop, DirectXPixelFormat::B8G8R8A8UIntNormalized, 2, poolSize);
         session = pool.CreateCaptureSession(item);
-        try { session.IsCursorCaptureEnabled(false); } catch (hresult_error const&) {}
+        session.IsCursorCaptureEnabled(false);
+        if(session.IsCursorCaptureEnabled())throw hresult_error(E_FAIL,L"Windows no permite excluir el cursor de la captura.");
         session.StartCapture();
     }
 
@@ -417,6 +418,10 @@ extern "C" __declspec(dllexport) HRESULT NVReadCurrent(void* capture, BYTE* pixe
 }
 extern "C" __declspec(dllexport) HRESULT NVSnapshot(void* capture, RECT area, BYTE* pixels, UINT width, UINT height, FilterSettings const* settings) noexcept {
     try{return static_cast<WindowFrames*>(capture)->Snapshot(area,pixels,width,height,*settings)?S_OK:S_FALSE;}
+    catch(...){return to_hresult();}
+}
+extern "C" __declspec(dllexport) HRESULT NVPump(void* capture,RECT area) noexcept {
+    try{return static_cast<WindowFrames*>(capture)->CaptureFrame(area)?S_OK:S_FALSE;}
     catch(...){return to_hresult();}
 }
 #ifdef NITIDEZ_CAPTURE_TESTS

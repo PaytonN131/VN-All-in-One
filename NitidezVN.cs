@@ -14,9 +14,9 @@ using System.Windows.Threading;
 using SD = System.Drawing;
 using WF = System.Windows.Forms;
 
-[assembly: System.Reflection.AssemblyTitle("Nitidez VN 4.2")]
-[assembly: System.Reflection.AssemblyVersion("4.2.0.0")]
-[assembly: System.Reflection.AssemblyFileVersion("4.2.0.0")]
+[assembly: System.Reflection.AssemblyTitle("Nitidez VN 4.3")]
+[assembly: System.Reflection.AssemblyVersion("4.3.0.0")]
+[assembly: System.Reflection.AssemblyFileVersion("4.3.0.0")]
 
 static class Native {
     [StructLayout(LayoutKind.Sequential)] public struct RECT { public int L,T,R,B; }
@@ -204,7 +204,7 @@ class ControlWindow : Window {
     SD.Rectangle displayBounds;
     string logPath=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"sesion.log");
     public ControlWindow() {
-        Title="Nitidez VN 4.2 — controles"; Width=Math.Min(1080,SystemParameters.WorkArea.Width-35); Height=Math.Min(860,SystemParameters.WorkArea.Height-35);MinWidth=880;MinHeight=620;Background=new SolidColorBrush(Color.FromRgb(33,29,38));Foreground=Brushes.White;FontFamily=new FontFamily("Segoe UI");FontSize=13;WindowStartupLocation=WindowStartupLocation.CenterScreen;
+        Title="Nitidez VN 4.3 — controles"; Width=Math.Min(1080,SystemParameters.WorkArea.Width-35); Height=Math.Min(860,SystemParameters.WorkArea.Height-35);MinWidth=880;MinHeight=620;Background=new SolidColorBrush(Color.FromRgb(33,29,38));Foreground=Brushes.White;FontFamily=new FontFamily("Segoe UI");FontSize=13;WindowStartupLocation=WindowStartupLocation.CenterScreen;
         using(var x=System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("Interfaz.xaml"))ui=(FrameworkElement)System.Windows.Markup.XamlReader.Load(x);Content=ui;
         var sections=(TabControl)ui.FindName("Sections");
         sections.SelectionChanged+=delegate(object sender,SelectionChangedEventArgs e){if(e.OriginalSource==sections)Dispatcher.BeginInvoke(new Action(delegate{var scroll=sections.Template.FindName("PanelScroller",sections) as ScrollViewer;if(scroll!=null)scroll.ScrollToTop();}),DispatcherPriority.Loaded);};
@@ -257,7 +257,7 @@ class ControlWindow : Window {
         Loaded+=delegate {
             try{CaptureFiles.Initialize();}catch(Exception ex){Log("Carpetas de archivos: "+ex.Message);}
             RefreshWindows();
-            Log("Inicio v4.2 (captura preparada y MP4 compacto). Windows="+Environment.OSVersion+" GPU WPF tier="+(RenderCapability.Tier>>16));
+            Log("Inicio v4.3 (captura nueva y clips sin pérdida). Windows="+Environment.OSVersion+" GPU WPF tier="+(RenderCapability.Tier>>16));
             if(rememberedExe.Length!=0){restoreTargetTimer.Start();RestoreTarget();}
             Dispatcher.BeginInvoke(new Action(SaveUiPreview),DispatcherPriority.ApplicationIdle);
         };

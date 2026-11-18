@@ -43,7 +43,8 @@ vec4 hook() {{
 }
 
 static class SceneFiles {
-    public const long MaximumVideoBytes = 30000000;
+    public const string LosslessEncoding="-c:v h264_nvenc -preset p3 -tune lossless -rc constqp -qp 0 -bf 0 -pix_fmt gbrp -colorspace rgb -c:a alac";
+    public const long PreferredVideoBytes = 30000000;
     public static readonly string Videos = Path.Combine(AudioFiles.Folder, "Videos");
     public static readonly string Screenshots = Path.Combine(AudioFiles.Folder, "Capturas");
     [DllImport("WindowCapture.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
@@ -95,14 +96,16 @@ static class SceneFiles {
         File.Move(temp, file);
     }
 
-    public static void RunFile(string args, string file, int timeout) {
+    public static void RunFile(string args, string file, int timeout,CancellationToken cancellation=default(CancellationToken)) {
         string temp = file + ".part";
         try {
             using (var process = Start("-nostdin " + args + " " + Quote(temp), false)) {
                 var error = process.StandardError.ReadToEndAsync();
                 process.BeginOutputReadLine();
                 try {
-                    if (!process.WaitForExit(timeout)) throw new TimeoutException("FFmpeg no terminó a tiempo.");
+                    var clock=Stopwatch.StartNew();
+                    while(!process.WaitForExit(100)){cancellation.ThrowIfCancellationRequested();if(clock.ElapsedMilliseconds>timeout)throw new TimeoutException("FFmpeg no terminó a tiempo.");}
+                    cancellation.ThrowIfCancellationRequested();
                     if (process.ExitCode != 0) throw Failure(error.Result);
                 } finally { if (!process.HasExited) { process.Kill(); process.WaitForExit(); } }
             }
@@ -120,32 +123,11 @@ static class SceneFiles {
     }
 
     public static void Trim(string source, string dest, double start, double end) {
-        ExportSmall(source,dest,start,end,Math.Min(MaximumVideoBytes,new FileInfo(source).Length));
+        if(end<=start)throw new IOException("El tramo elegido está vacío.");
+        RunFile("-ss "+Number(start)+" -i "+Quote(source)+" -t "+Number(end-start)+" -map 0:v:0 -map 0:a:0? "+LosslessEncoding+" -fps_mode passthrough -movflags +faststart -f mp4",dest,1800000);
     }
-
-    public static void ExportSmall(string source,string dest,double start,double end,long maximum) {
-        double seconds=end-start;
-        if(seconds<=0||Double.IsNaN(seconds)||Double.IsInfinity(seconds))throw new IOException("Duración de vídeo inválida.");
-        for(int attempt=0;attempt<4;attempt++){
-            int rate=(int)Math.Max(12000,Math.Min(1800000,((maximum-16000)*8*.90/seconds-48000)*Math.Pow(.70,attempt)));
-            int height=rate<180000?240:rate<400000?360:rate<800000?480:720;
-            string temp=dest+"."+Guid.NewGuid().ToString("N")+".mp4";
-            try{
-                RunFile("-ss "+Number(start)+" -i "+Quote(source)+" -t "+Number(seconds)+
-                    " -map 0:v:0 -map 0:a:0? -vf "+Quote("scale=-2:'min(ih,"+height+")'")+
-                    " -c:v libx264 -preset fast -b:v "+rate+" -maxrate "+rate+" -bufsize "+rate+
-                    " -threads:v 2 -c:a aac -b:a 48k -movflags +faststart -f mp4",temp,1800000);
-                if(new FileInfo(temp).Length<=maximum){File.Move(temp,dest);return;}
-            }finally{if(File.Exists(temp))File.Delete(temp);}
-        }
-        throw new IOException("No se pudo cumplir el límite de tamaño conservando este tramo.");
-    }
-
-    public static void FinishSmallVideo(string source,string dest) {
-        if(new FileInfo(source).Length<=MaximumVideoBytes){FinishFile(source,dest);return;}
-        double duration=Duration(source,0);
-        if(duration<=0)throw new IOException("No se pudo obtener la duración del vídeo.");
-        ExportSmall(source,dest,0,duration,MaximumVideoBytes);
+    public static void Preview(string source,string dest,CancellationToken cancellation){
+        RunFile("-i "+Quote(source)+" -map 0:v:0 -map 0:a:0? -vf "+Quote("scale=-2:'min(ih,540)'")+" -c:v libx264 -preset ultrafast -crf 26 -pix_fmt yuv420p -threads:v 2 -c:a aac -b:a 96k -movflags +faststart -f mp4",dest,1800000,cancellation);
     }
 
     public static double Duration(string source, double fallback) {

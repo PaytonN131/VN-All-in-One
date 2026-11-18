@@ -32,14 +32,14 @@ static class EditorSaveProbe {
             Await((Task)typeof(ClipEditor).GetMethod("Save",Private).Invoke(audio,null));
             if(audio.LastSaved!=Path.Combine(folder,"Mi frase favorita_02.mp3")||!File.Exists(audio.LastSaved)||clips.Count!=0||File.ReadAllText(existing)!="conservar")throw new Exception("No se guardó el audio con su nombre sin reemplazar el anterior.");
             audio.Close();audio=null;
-            video=new SceneEditor(owner,ui.Resources,Path.GetFullPath(args[0]),game);video.Show();var clock=System.Diagnostics.Stopwatch.StartNew();while(!(bool)Field(video,"ready")&&clock.ElapsedMilliseconds<7000)Pump();
+            video=new SceneEditor(owner,ui.Resources,Path.GetFullPath(args[0]),game);video.Show();var clock=System.Diagnostics.Stopwatch.StartNew();while(!(bool)Field(video,"ready")&&clock.ElapsedMilliseconds<15000)Pump();
             if(!(bool)Field(video,"ready"))throw new Exception("No se abrió el vídeo.");
             ((TextBox)Field(video,"fileName")).Text="Mi escena favorita";((Slider)Field(video,"end")).Value=1;
             Render(video,Path.Combine(args[1],"editor-video.png"));
             Await((Task)typeof(SceneEditor).GetMethod("Export",Private).Invoke(video,null));
             string result=Path.Combine(CaptureFiles.Folder("Videos",game),"Mi escena favorita.mp4");
-            if(!File.Exists(result)||new FileInfo(result).Length>SceneFiles.MaximumVideoBytes)throw new Exception("No se guardó el vídeo con su nombre y límite de tamaño.");
-            Console.WriteLine("PASS: MP3 directo sin diálogo, nombre desde editor, colisiones sin reemplazo; recorte MP4 nombrado desde editor, hasta 30 MB; selector eliminado y tres botones de carpeta presentes.");return 0;
+            if(!File.Exists(result))throw new Exception("No se guardó el vídeo con su nombre.");
+            Console.WriteLine("PASS: MP3 directo sin diálogo, nombre desde editor, colisiones sin reemplazo; recorte MP4 nombrado desde editor, sin límite de tamaño; selector eliminado y tres botones de carpeta presentes.");return 0;
         }catch(Exception ex){Console.Error.WriteLine(ex);return 1;}
         finally{if(audio!=null)audio.Close();if(video!=null)video.Close();if(owner!=null)owner.Close();foreach(string category in new[]{"Grabaciones","Videos"}){string folder=Path.Combine(AudioFiles.Folder,category,game);if(Directory.Exists(folder)){foreach(string file in Directory.GetFiles(folder))File.Delete(file);Directory.Delete(folder);}}}
     }

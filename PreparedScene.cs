@@ -16,6 +16,8 @@ sealed class SceneFrame {
 sealed class PreparedScene : IDisposable {
     sealed class PhotoRequest {
         public SceneLook Look;
+        public WindowCapture Capture;
+        public readonly Stopwatch Clock=Stopwatch.StartNew();
         public readonly TaskCompletionSource<SceneFrame> Result=new TaskCompletionSource<SceneFrame>();
     }
     readonly Choice target;
@@ -43,9 +45,9 @@ sealed class PreparedScene : IDisposable {
             if(recording!=null)throw new IOException("Ya hay una grabación.");
             var area=BorderlessWindow.ClientBounds(target.H);
             if(area.Width<2||area.Height<2)throw new IOException("El área del juego está vacía.");
-            double scale=Math.Min(1,Math.Min(limit/(double)area.Height,limit*16.0/9/area.Width));
-            recording=new FastSceneRecording(audio,look,output,Math.Max(2,(int)(area.Width*scale)&~1),
-                Math.Max(2,(int)(area.Height*scale)&~1),fps);
+            double scale=limit==0?1:Math.Min(1,Math.Min(limit/(double)area.Height,limit*16.0/9/area.Width));
+            recording=new FastSceneRecording(audio,look,output,limit==0?area.Width:Math.Max(2,(int)(area.Width*scale)&~1),
+                limit==0?area.Height:Math.Max(2,(int)(area.Height*scale)&~1),fps);
             wake.Set();return recording;
         }
     }
@@ -60,6 +62,7 @@ sealed class PreparedScene : IDisposable {
     }
     void Run() {
         Exception failure=null;
+        PhotoRequest pending=null;
         try {
             using(var capture=new WindowCapture(target.H)) {
                 var neutral=new SceneLook(0,0,1,1,0,1);
@@ -71,13 +74,17 @@ sealed class PreparedScene : IDisposable {
                 }
                 while(!closing) {
                     PhotoRequest request;
-                    while(photos.TryDequeue(out request)) {
+                    if(pending==null&&photos.TryDequeue(out request))pending=request;
+                    if(pending!=null) {
                         try {
-                            var frame=Frame(capture,request.Look,0,0);
-                            if(frame==null)throw new IOException("No hay imagen disponible.");
-                            request.Result.SetResult(frame);
+                            // A new session can only supply frames obtained after this request.
+                            // Do not use the recording session's cached texture for photographs.
+                            if(pending.Capture==null)pending.Capture=new WindowCapture(target.H);
+                            var frame=Frame(pending.Capture,pending.Look,0,0);
+                            if(frame!=null){pending.Result.SetResult(frame);pending.Capture.Dispose();pending=null;}
+                            else if(pending.Clock.ElapsedMilliseconds>2000)throw new IOException("No llegó una imagen nueva. No se guardó una captura anterior.");
                         }
-                        catch(Exception ex){request.Result.SetException(ex);}
+                        catch(Exception ex){pending.Result.TrySetException(ex);if(pending.Capture!=null)pending.Capture.Dispose();pending=null;}
                     }
                     FastSceneRecording active;
                     lock(gate)active=recording;
@@ -90,11 +97,13 @@ sealed class PreparedScene : IDisposable {
                             if(frame!=null)active.Add(frame.Pixels);
                         }
                     }
-                    wake.WaitOne(active==null?50:1);
+                    else capture.Pump(BorderlessWindow.ClientBounds(target.H));
+                    wake.WaitOne(active==null&&pending==null?16:1);
                 }
             }
         }catch(Exception ex){failure=ex;Error=ex.Message;}
         finally {
+            if(pending!=null){if(pending.Capture!=null)pending.Capture.Dispose();pending.Result.TrySetException(failure??new IOException("Captura cerrada."));}
             Ready=false;
             lock(gate)if(recording!=null){recording.Fail(failure??new IOException("Captura cerrada."));recording.Complete();}
             PhotoRequest request;
@@ -163,8 +172,8 @@ sealed class FastSceneRecording {
             using(var pipe=new NamedPipeServerStream(name,PipeDirection.Out,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous,0,32768))
             using(var process=SceneFiles.Start("-nofind_stream_info -thread_queue_size 4 -f rawvideo -pixel_format bgra -video_size "+
                 Width+"x"+Height+" -framerate "+fps+" -i pipe:0 -nofind_stream_info -thread_queue_size 16 -f s16le -ar 44100 -ac 2 -i "+
-                SceneFiles.Quote(@"\\.\pipe\"+name)+" -map 0:v:0 -map 1:a:0 -c:v h264_nvenc -preset p3 -tune ll -bf 0 -rc vbr -cq 30"+
-                " -b:v 1600k -maxrate 2200k -bufsize 2200k -c:a aac -b:a 64k -shortest -movflags +faststart -f mp4 "+SceneFiles.Quote(temp),true)) {
+                SceneFiles.Quote(@"\\.\pipe\"+name)+" -map 0:v:0 -map 1:a:0 "+SceneFiles.LosslessEncoding+
+                " -shortest -movflags +faststart -f mp4 "+SceneFiles.Quote(temp),true)) {
                 var errors=process.StandardError.ReadToEndAsync();process.BeginOutputReadLine();
                 var connected=pipe.WaitForConnectionAsync();
                 var video=Task.Run(delegate {
@@ -209,7 +218,7 @@ sealed class FastSceneRecording {
                     if(sound!=null)sound.GetAwaiter().GetResult();
                 }
             }
-            try{SceneFiles.FinishSmallVideo(temp,output);}
+            try{SceneFiles.FinishFile(temp,output);}
             catch(Exception ex){
                 string recovery=output+".pendiente";
                 if(File.Exists(temp))File.Move(temp,recovery);

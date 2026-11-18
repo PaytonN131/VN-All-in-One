@@ -36,7 +36,7 @@ sealed class SceneControls : IDisposable {
         this.audioClips = audioClips;
         status = (TextBlock)ui.FindName("SceneStatus"); keys = (TextBlock)ui.FindName("SceneKeys");
         resolution = (ComboBox)ui.FindName("SceneResolution");
-        resolution.Items.Add("1080p"); resolution.Items.Add("720p"); resolution.SelectedIndex = 0;
+        resolution.Items.Add("Original (sin reducir)");resolution.Items.Add("1080p"); resolution.Items.Add("720p"); resolution.SelectedIndex = 0;
         videoFps = (ComboBox)ui.FindName("SceneFps");
         videoFps.Items.Add("60 FPS"); videoFps.Items.Add("30 FPS"); videoFps.SelectedIndex = 0;
         record = (Button)ui.FindName("SceneRecord"); screenshot = (Button)ui.FindName("SceneScreenshot"); edit = (Button)ui.FindName("SceneEdit");
@@ -46,11 +46,11 @@ sealed class SceneControls : IDisposable {
         ((Button)ui.FindName("VideoFolder")).Click+=delegate{try{CaptureFiles.OpenFolder("Videos",target);}catch(Exception ex){notice="No se pudo abrir la carpeta: "+ex.Message;}Refresh();};
         ((Button)ui.FindName("ScreenshotFolder")).Click+=delegate{try{CaptureFiles.OpenFolder("Capturas",target);}catch(Exception ex){notice="No se pudo abrir la carpeta: "+ex.Message;}Refresh();};
         ((Button)ui.FindName("SceneRename")).Click+=delegate{
-            try{string renamed=CaptureFiles.RenameDialog(owner,ui.Resources,"Videos");if(renamed!=null){lastVideo=renamed;notice="Vídeo renombrado: "+renamed;}}
+            try{string renamed=CaptureFiles.RenameDialog(owner,ui.Resources,"Videos");if(renamed!=null){lastVideo=renamed;notice="Clip renombrado: "+renamed;}}
             catch(Exception ex){notice="No se pudo renombrar: "+ex.Message;}Refresh();
         };
         string[] controls={"VideoStartKey","VideoStopKey","ScreenshotKey"};
-        string[] actions={"Iniciar vídeo","Detener vídeo","Capturar PNG"};
+        string[] actions={"Iniciar clip","Detener clip","Capturar PNG"};
         string symbols="{}<";
         for(int i=0;i<3;i++){
             uint[] symbol=ShortcutBinding.Symbol(symbols[i]);
@@ -67,13 +67,13 @@ sealed class SceneControls : IDisposable {
     public void Load(System.Xml.XmlElement node) {
         for(int i=0;i<3;i++)shortcuts[i].Load(node,"atajoEscena"+i);
         UpdateKeyLabels();
-        resolution.SelectedIndex = node.GetAttribute("videoResolucion") == "720p" ? 1 : 0;
-        videoFps.SelectedIndex = node.GetAttribute("videoFps") == "30" ? 1 : 0;
+        resolution.SelectedIndex=node.GetAttribute("clipsResolucion")=="720p"?2:node.GetAttribute("clipsResolucion")=="1080p"?1:0;
+        videoFps.SelectedIndex = node.GetAttribute("clipsFps") == "30" ? 1 : 0;
     }
     public void Save(System.Xml.XmlWriter writer) {
         for(int i=0;i<3;i++)shortcuts[i].Save(writer,"atajoEscena"+i);
-        writer.WriteAttributeString("videoResolucion", resolution.SelectedItem.ToString());
-        writer.WriteAttributeString("videoFps", videoFps.SelectedIndex == 1 ? "30" : "60");
+        writer.WriteAttributeString("clipsResolucion", resolution.SelectedItem.ToString());
+        writer.WriteAttributeString("clipsFps", videoFps.SelectedIndex == 1 ? "30" : "60");
     }
 
     public void Select(Choice game) {
@@ -107,7 +107,7 @@ sealed class SceneControls : IDisposable {
         videoFps.IsEnabled = recording == null;
         screenshot.IsEnabled = valid && !capturing&&prepared!=null&&prepared.Ready;
         edit.IsEnabled = recording == null;
-        record.Content = recording == null ? "Grabar MP4 con filtro" : recording.Stopping ? "Finalizando…" : "Detener vídeo";
+        record.Content = recording == null ? "Grabar MP4 con filtro" : recording.Stopping ? "Finalizando…" : "Detener clip";
         if (recording != null && !recording.Stopping && !readyCuePlayed) {
             readyCuePlayed = true;
             System.Media.SystemSounds.Asterisk.Play();
@@ -116,7 +116,7 @@ sealed class SceneControls : IDisposable {
             "● Grabando · " + recording.RecordedElapsed.ToString(@"mm\:ss") + "  ";
         if (capturing) state += "Capturando PNG… ";
         string message = state + (notice ?? (valid ? prepared!=null&&prepared.Error!=null?prepared.Error:
-            prepared!=null&&prepared.Ready?"Captura lista · MP4 de hasta 30 MB.":"Preparando captura…" : "Selecciona la ventana del juego."));
+            prepared!=null&&prepared.Ready?"Captura lista · Se prioriza calidad, sin límite de peso.":"Preparando captura…" : "Selecciona la ventana del juego."));
         if (status.Text != message) status.Text = message;
         ((TextBlock)ui.FindName("ScreenshotStatus")).Text=message;
     }
@@ -154,7 +154,7 @@ sealed class SceneControls : IDisposable {
     async void Start() {
         if (recording != null || !Valid()||prepared==null||!prepared.Ready) return;
         try {
-            int limit = resolution.SelectedIndex == 1 ? 720 : 1080;
+            int limit = resolution.SelectedIndex==0?0:resolution.SelectedIndex==2?720:1080;
             int fps = videoFps.SelectedIndex == 1 ? 30 : 60;
             string game=CaptureFiles.Game(target);
             string path = SceneFiles.Output(CaptureFiles.Folder("Videos",game), game, ".mp4");
@@ -164,7 +164,7 @@ sealed class SceneControls : IDisposable {
             notice = "";
             Refresh();
             lastVideo = await recording.Result;
-            notice = "Vídeo con filtro guardado en " + lastVideo;
+            notice = "Clip con filtro guardado en " + lastVideo;
         } catch (Exception ex) { notice = "No se pudo grabar: " + ex.GetBaseException().Message; }
         finally { audioClips.ReleaseVideoAudio(); recording = null; Refresh(); }
     }
@@ -196,8 +196,8 @@ sealed class SceneControls : IDisposable {
         if (editor != null) { editor.Activate(); return; }
         try {
             Directory.CreateDirectory(SceneFiles.Videos);
-            var file = new Microsoft.Win32.OpenFileDialog { Title = "Abrir vídeo para recortar",
-                Filter = "Vídeo MP4 (*.mp4)|*.mp4", InitialDirectory = File.Exists(lastVideo)?Path.GetDirectoryName(lastVideo):SceneFiles.Videos,
+            var file = new Microsoft.Win32.OpenFileDialog { Title = "Abrir clip para recortar",
+                Filter = "Clip MP4 (*.mp4)|*.mp4", InitialDirectory = File.Exists(lastVideo)?Path.GetDirectoryName(lastVideo):SceneFiles.Videos,
                 FileName = File.Exists(lastVideo) ? Path.GetFileName(lastVideo) : "" };
             if (file.ShowDialog(owner) != true) return;
             editor = new SceneEditor(owner, ui.Resources, file.FileName,target==null?null:CaptureFiles.Game(target));
@@ -213,7 +213,7 @@ sealed class SceneControls : IDisposable {
 
     public bool CanClose() {
         if (recording != null) {
-            Stop(); notice = "El vídeo se está guardando. Cierra cuando termine.";
+            Stop(); notice = "El clip se está guardando. Cierra cuando termine.";
             Refresh();
             return false;
         }
@@ -243,6 +243,9 @@ sealed class SceneEditor : Window {
         markStart = new Button { Content = "Marcar inicio aquí" },
         markEnd = new Button { Content = "Marcar final aquí" };
     readonly DispatcherTimer timer;
+    readonly System.Threading.CancellationTokenSource previewCancellation=new System.Threading.CancellationTokenSource();
+    string previewPath;
+    bool preparingPreview;
     bool ready, updating, playing, closed, exporting, removing;
     public bool Busy { get { return exporting || removing; } }
     public event Action<string> Recycled;
@@ -250,7 +253,7 @@ sealed class SceneEditor : Window {
     public SceneEditor(Window owner, ResourceDictionary style, string source,string game=null) {
         Owner = owner; this.source = source; Resources.MergedDictionaries.Add(style);
         outputFolder=CaptureFiles.Inside(source,SceneFiles.Videos)?Path.GetDirectoryName(source):CaptureFiles.Folder("Videos",game??"Otros");
-        Title = "Nitidez VN · Recortar vídeo"; Width = 760;
+        Title = "Nitidez VN · Recortar clip"; Width = 760;
         Height = Math.Min(720, SystemParameters.WorkArea.Height - 25);
         MinWidth = 520; MinHeight = 460; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = new SolidColorBrush(Color.FromRgb(33,29,38)); Foreground = Brushes.White;
@@ -265,7 +268,7 @@ sealed class SceneEditor : Window {
         controls.Children.Add(trimInfo);
         controls.Children.Add(new TextBlock { Text = "Inicio del recorte" }); controls.Children.Add(start);
         controls.Children.Add(new TextBlock { Text = "Final del recorte" }); controls.Children.Add(end);
-        controls.Children.Add(new TextBlock{Text="Nombre del vídeo que vas a guardar (sin .mp4)",Margin=new Thickness(0,8,0,0)});
+        controls.Children.Add(new TextBlock{Text="Nombre del clip que vas a guardar (sin .mp4)",Margin=new Thickness(0,8,0,0)});
         fileName.Text="Recorte_"+DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");controls.Children.Add(fileName);
         var actions = new WrapPanel { Margin = new Thickness(0, 8, 0, 8) };
         foreach (var button in new[] { play, stop, markStart, markEnd, save, recycle, folderButton }) { button.Margin = new Thickness(0, 0, 8, 4); actions.Children.Add(button); }
@@ -282,7 +285,7 @@ sealed class SceneEditor : Window {
             Pause();
             double duration = await Task.Run(() => SceneFiles.Duration(source, fallback));
             if (closed || removing) return;
-            if (duration <= 0) { status.Text = "El vídeo no informó su duración."; return; }
+            if (duration <= 0) { status.Text = "El clip no informó su duración."; return; }
             updating = true;
             start.Maximum = end.Maximum = position.Maximum = duration;
             end.Value = duration; start.Value = 0;
@@ -290,7 +293,7 @@ sealed class SceneEditor : Window {
             Pause(); Seek(0); UpdateControls();
         };
         media.MediaFailed += delegate(object sender, ExceptionRoutedEventArgs e) {
-            ready = false; Pause(); status.Text = "No se pudo reproducir el vídeo: " + e.ErrorException.Message; UpdateControls();
+            ready = false; Pause(); status.Text = "No se pudo reproducir el clip: " + e.ErrorException.Message; UpdateControls();
         };
         media.MediaEnded += delegate { Pause(); Seek(end.Value); };
         position.ValueChanged += delegate { if (ready && !updating) { Pause(); media.Position = TimeSpan.FromSeconds(position.Value); } };
@@ -304,11 +307,23 @@ sealed class SceneEditor : Window {
         folderButton.Click+=delegate{try{CaptureFiles.OpenPath(outputFolder);}catch(Exception ex){status.Text="No se pudo abrir la carpeta: "+ex.Message;}};
         recycle.Click += async delegate { await RecycleVideo(); };
         Closing += delegate(object sender, System.ComponentModel.CancelEventArgs e) { if (Busy) e.Cancel = true; };
-        Closed += delegate { closed = true; timer.Stop(); media.Close(); };
+        Closed += delegate { closed = true; previewCancellation.Cancel();timer.Stop(); media.Close();DeletePreview(); };
         Deactivated += delegate { Pause(); };
         UpdateControls();
-        media.Source = new Uri(source);
-        media.Play(); // Load metadata; MediaOpened immediately pauses.
+        Loaded+=async delegate{await LoadPreview();};
+    }
+
+    void DeletePreview(){try{if(previewPath!=null&&File.Exists(previewPath))File.Delete(previewPath);}catch(IOException){}}
+    async Task LoadPreview(){
+        preparingPreview=true;UpdateControls();status.Text="Preparando vista previa… El clip original conserva su calidad.";
+        previewPath=Path.Combine(Path.GetTempPath(),"Nitidez-previa-"+Guid.NewGuid().ToString("N")+".mp4");
+        try{
+            await Task.Run(()=>SceneFiles.Preview(source,previewPath,previewCancellation.Token));
+            if(closed){DeletePreview();return;}
+            media.Source=new Uri(previewPath);status.Text="Vista previa lista. El recorte se guarda desde el original, sin reducir su calidad.";media.Play();
+        }catch(OperationCanceledException){DeletePreview();}
+        catch(Exception ex){if(!closed)status.Text="No se pudo preparar la vista previa: "+ex.GetBaseException().Message;DeletePreview();}
+        finally{preparingPreview=false;if(!closed)UpdateControls();}
     }
 
     void SetPosition(double seconds) {
@@ -332,7 +347,7 @@ sealed class SceneEditor : Window {
     void UpdateControls() {
         position.IsEnabled = start.IsEnabled = end.IsEnabled = play.IsEnabled = stop.IsEnabled =
             markStart.IsEnabled = markEnd.IsEnabled = save.IsEnabled = ready && !Busy;
-        recycle.IsEnabled = !Busy && IsManagedVideo() && File.Exists(source);
+        recycle.IsEnabled = !Busy && !preparingPreview && IsManagedVideo() && File.Exists(source);
         fileName.IsEnabled=ready&&!Busy;
         trimInfo.Text = String.Format("Inicio {0:F2} s  ·  Final {1:F2} s  ·  Recorte {2:F2} s", start.Value, end.Value, end.Value - start.Value);
     }
@@ -355,7 +370,7 @@ sealed class SceneEditor : Window {
 
     async Task RecycleVideo() {
         if (Busy || !IsManagedVideo()) return;
-        if (MessageBox.Show(this, "¿Enviar este vídeo a la Papelera?\n\n" + Path.GetFileName(source),
+        if (MessageBox.Show(this, "¿Enviar este clip a la Papelera?\n\n" + Path.GetFileName(source),
             "Nitidez VN", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
         removing = true; ready = false; Pause(); media.Close(); UpdateControls();
         try {
@@ -364,7 +379,7 @@ sealed class SceneEditor : Window {
         } catch (Exception ex) {
             status.Text = "No se pudo enviar a la Papelera: " + ex.GetBaseException().Message;
             removing = false; UpdateControls();
-            media.Source = new Uri(source); media.Play();
+            media.Source = new Uri(previewPath??source); media.Play();
             return;
         }
         removing = false;
