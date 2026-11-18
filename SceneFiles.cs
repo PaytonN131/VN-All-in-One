@@ -43,7 +43,7 @@ vec4 hook() {{
 }
 
 static class SceneFiles {
-    public const string VideoQualityEncoding="-vf scale=out_color_matrix=bt709:out_range=tv -c:v h264_nvenc -preset p4 -tune hq -rc constqp -qp 8 -bf 0 -rc-lookahead 0 -pix_fmt yuv420p -color_range tv -colorspace bt709 -color_primaries bt709 -color_trc bt709";
+    public const string VideoQualityEncoding="-vf scale=out_color_matrix=bt709:out_range=tv,setparams=range=limited:color_primaries=bt709:color_trc=bt709:colorspace=bt709 -c:v h264_nvenc -preset p4 -tune hq -rc constqp -qp 8 -bf 0 -rc-lookahead 0 -pix_fmt yuv420p -color_range tv -colorspace bt709 -color_primaries bt709 -color_trc bt709";
     public const string CompatibleEncoding=VideoQualityEncoding+" -c:a aac -b:a 160k";
     public static readonly string Clips = Path.Combine(AudioFiles.Folder, "Clips");
     public static readonly string Screenshots = Path.Combine(AudioFiles.Folder, "Capturas");
