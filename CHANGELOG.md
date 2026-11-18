@@ -1,11 +1,13 @@
-# Nitidez VN 4.3
+# Historial de versiones
 
-- Vídeo pasa a llamarse Clips.
-- Grabación con filtro y codificación RGB sin pérdida; resolución original y 60 FPS de forma inicial.
-- Se eliminó el límite de 30 MB y la compresión automática que reducía resolución o calidad.
-- Recortes sin pérdida, conservando resolución y fotogramas por segundo.
-- Cada captura de imagen usa una sesión nueva para no reutilizar fotogramas anteriores al diálogo. La sesión preparada de grabación se mantiene al día mientras espera.
-- Cursor de Windows excluido en las sesiones de captura. Un cursor dibujado por el juego forma parte de su imagen y puede aparecer.
-- Vista previa temporal compatible en el editor, separada del original; se elimina al cerrar y se cancela su preparación si se cierra antes.
+## 4.4 — Grabación compatible y editores organizados
 
-Verificado en este PC: 60 fotogramas de prueba RGB idénticos tras codificar y decodificar; 45 fotogramas recortados idénticos al tramo original; clip a 1906 × 1066 y 60 FPS con filtro; tres cambios de diálogo tras pausas sin capturas antiguas; editor y guardado funcionando.
+- Recupera los ajustes H.264/NVENC y AAC de la versión 3.0, sin límite de tamaño ni compresión posterior para reducir el peso.
+- Prepara la captura antes de iniciar y conserva los primeros fotogramas en memoria mientras arranca el codificador. No descarta un segundo inicial.
+- Adelanta la preparación de las superficies de captura. La prueba de esta versión conservó el primer fotograma a los 7,4 ms en este equipo; el resultado depende de la carga y del hardware.
+- Reorganiza ambos editores en tres pasos: revisión, selección del tramo y guardado con nombre.
+- Separa las acciones de descartar o enviar a la Papelera de los controles de reproducción y guardado.
+- Abre directamente los MP4 compatibles en la vista previa. Mantiene una vista previa alternativa para archivos antiguos que Windows no pueda reproducir directamente.
+- Conserva las capturas nuevas por pulsación, exclusión del cursor de Windows, atajos, guardado directo de MP3 y carpetas por juego.
+
+Verificación: grabación a 60 FPS, filtro visible en PNG y MP4, audio del proceso, recortes, reproducción en el editor, nombres personalizados y conservación de archivos existentes. Pruebas con una ventana animada; no implica compatibilidad universal con todos los juegos.
