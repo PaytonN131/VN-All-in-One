@@ -37,10 +37,10 @@ static class EditorSaveProbe {
             ((TextBox)Field(video,"fileName")).Text="Mi escena favorita";((Slider)Field(video,"end")).Value=1;
             Render(video,Path.Combine(args[1],"editor-video.png"));
             Await((Task)typeof(SceneEditor).GetMethod("Export",Private).Invoke(video,null));
-            string result=Path.Combine(CaptureFiles.Folder("Videos",game),"Mi escena favorita.mp4");
+            string result=Path.Combine(CaptureFiles.Folder("Clips",game),"Mi escena favorita.mp4");
             if(!File.Exists(result))throw new Exception("No se guardó el vídeo con su nombre.");
             Console.WriteLine("PASS: MP3 directo sin diálogo, nombre desde editor, colisiones sin reemplazo; recorte MP4 nombrado desde editor, sin límite de tamaño; selector eliminado y tres botones de carpeta presentes.");return 0;
         }catch(Exception ex){Console.Error.WriteLine(ex);return 1;}
-        finally{if(audio!=null)audio.Close();if(video!=null)video.Close();if(owner!=null)owner.Close();foreach(string category in new[]{"Grabaciones","Videos"}){string folder=Path.Combine(AudioFiles.Folder,category,game);if(Directory.Exists(folder)){foreach(string file in Directory.GetFiles(folder))File.Delete(file);Directory.Delete(folder);}}}
+        finally{if(audio!=null)audio.Close();if(video!=null)video.Close();if(owner!=null)owner.Close();foreach(string category in new[]{"Grabaciones","Clips"}){string folder=Path.Combine(AudioFiles.Folder,category,game);if(Directory.Exists(folder)){foreach(string file in Directory.GetFiles(folder))File.Delete(file);Directory.Delete(folder);}}}
     }
 }

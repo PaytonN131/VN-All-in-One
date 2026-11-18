@@ -17,7 +17,28 @@ static class CaptureFiles {
     }
     public static void OpenPath(string folder){Directory.CreateDirectory(folder);System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo{FileName=folder,UseShellExecute=true});}
     public static void OpenFolder(string category,Choice game){OpenPath(game==null?Path.Combine(AudioFiles.Folder,category):Folder(category,Game(game)));}
-    public static void Initialize(){foreach(string category in new[]{"Capturas","Grabaciones","Videos"})Directory.CreateDirectory(Path.Combine(AudioFiles.Folder,category));}
+    public static void Initialize(){MigrateVideosToClips(AudioFiles.Folder);foreach(string category in new[]{"Capturas","Grabaciones","Clips"})Directory.CreateDirectory(Path.Combine(AudioFiles.Folder,category));}
+    public static void MigrateVideosToClips(string root){
+        string storage=Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar);
+        string oldFolder=Path.GetFullPath(Path.Combine(storage,"Videos")),newFolder=Path.GetFullPath(Path.Combine(storage,"Clips"));
+        if(!String.Equals(Path.GetDirectoryName(oldFolder),storage,StringComparison.OrdinalIgnoreCase)||!String.Equals(Path.GetDirectoryName(newFolder),storage,StringComparison.OrdinalIgnoreCase))throw new IOException("Las carpetas no pertenecen al destino de guardado.");
+        if(!Directory.Exists(oldFolder))return;
+        if(File.Exists(newFolder))throw new IOException("Existe un archivo llamado Clips. Se conserva Videos sin moverlo.");
+        MergeFolder(oldFolder,newFolder);
+    }
+    static string UnusedPath(string path,bool directory){
+        if(!File.Exists(path)&&!Directory.Exists(path))return path;
+        string parent=Path.GetDirectoryName(path),name=directory?Path.GetFileName(path):Path.GetFileNameWithoutExtension(path),ext=directory?"":Path.GetExtension(path);
+        for(int n=2;;n++){string candidate=Path.Combine(parent,name+"_"+n.ToString("D2")+ext);if(!File.Exists(candidate)&&!Directory.Exists(candidate))return candidate;}
+    }
+    static void MergeFolder(string source,string destination){
+        if((File.GetAttributes(source)&FileAttributes.ReparsePoint)!=0)throw new IOException("La carpeta Videos contiene un enlace. Se conserva para revisar su traslado.");
+        if(!Directory.Exists(destination)){Directory.Move(source,UnusedPath(destination,true));return;}
+        if((File.GetAttributes(destination)&FileAttributes.ReparsePoint)!=0)throw new IOException("Clips contiene un enlace; se conserva la carpeta anterior.");
+        foreach(string file in Directory.GetFiles(source))File.Move(file,UnusedPath(Path.Combine(destination,Path.GetFileName(file)),false));
+        foreach(string child in Directory.GetDirectories(source))MergeFolder(child,Path.Combine(destination,Path.GetFileName(child)));
+        if(Directory.GetFileSystemEntries(source).Length==0)Directory.Delete(source,false);
+    }
     public static string Name(string value){
         string name=Regex.Replace(value??"","\\s+"," ").Trim();
         foreach(char c in Path.GetInvalidFileNameChars())name=name.Replace(c,'_');
@@ -32,7 +53,7 @@ static class CaptureFiles {
     }
     public static string Game(Choice target){return Name(String.IsNullOrWhiteSpace(target.GameName)?SuggestedName(target.Title):target.GameName);}
     public static string Folder(string category,string game){
-        if(category!="Capturas"&&category!="Grabaciones"&&category!="Videos")throw new ArgumentException("Categoría inválida.");
+        if(category!="Capturas"&&category!="Grabaciones"&&category!="Clips")throw new ArgumentException("Categoría inválida.");
         string folder=Path.Combine(AudioFiles.Folder,category,Name(game));Directory.CreateDirectory(folder);return folder;
     }
     public static bool Inside(string file,string folder){
@@ -53,7 +74,7 @@ static class CaptureFiles {
         throw new IOException("No se pudo reservar un nombre de captura libre.");
     }
     public static string Rename(string source,string newName,string category){
-        string ext=category=="Grabaciones"?".mp3":category=="Videos"?".mp4":null;
+        string ext=category=="Grabaciones"?".mp3":category=="Clips"?".mp4":null;
         if(ext==null||!String.Equals(Path.GetExtension(source),ext,StringComparison.OrdinalIgnoreCase)||!Inside(source,Path.Combine(AudioFiles.Folder,category)))throw new IOException("Selecciona un archivo de la carpeta "+category+" del programa.");
         string name=(newName??"").Trim();
         if(name.EndsWith(ext,StringComparison.OrdinalIgnoreCase))name=name.Substring(0,name.Length-ext.Length);

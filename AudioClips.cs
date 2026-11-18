@@ -25,9 +25,14 @@ sealed class AudioClip {
 }
 
 static class AudioFiles {
-    public static readonly string Folder = Directory.Exists(@"D:\")
-        ? @"D:\Archivos VN All in One"
-        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "Archivos VN All in One");
+    public static readonly string Folder = StorageFolder();
+    static string StorageFolder(){
+#if NITIDEZ_TESTS
+        string testFolder=Environment.GetEnvironmentVariable("NITIDEZ_TEST_STORAGE");
+        if(!String.IsNullOrWhiteSpace(testFolder))return Path.GetFullPath(testFolder);
+#endif
+        return Directory.Exists(@"D:\")?@"D:\Archivos VN All in One":Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"Archivos VN All in One");
+    }
 
     public static MemoryStream Preview(AudioClip clip, int start, int end) {
         int length = (end - start) * AudioRing.FrameBytes;

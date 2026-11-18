@@ -15,8 +15,8 @@ static class StorageProbe {
             Task.WaitAll(shots);
             if(shots.Select(t=>t.Result).Distinct(StringComparer.OrdinalIgnoreCase).Count()!=8)throw new Exception("Se repitió un nombre de captura.");
             if(!shots.Any(t=>Path.GetFileName(t.Result)==game+"_01.png"))throw new Exception("La numeración no empezó en 01.");
-            foreach(string category in new[]{"Grabaciones","Videos"}){
-                string ext=category=="Videos"?".mp4":".mp3";
+            foreach(string category in new[]{"Grabaciones","Clips"}){
+                string ext=category=="Clips"?".mp4":".mp3";
                 string folder=CaptureFiles.Folder(category,game),source=Path.Combine(folder,"Original"+ext),existing=Path.Combine(folder,"Existente"+ext);
                 File.WriteAllText(source,"original");File.WriteAllText(existing,"conservar");
                 bool rejected=false;
@@ -33,7 +33,7 @@ static class StorageProbe {
             return 0;
         }catch(Exception ex){Console.Error.WriteLine(ex);return 1;}
         finally{
-            foreach(string category in new[]{"Capturas","Grabaciones","Videos"}){
+            foreach(string category in new[]{"Capturas","Grabaciones","Clips"}){
                 string folder=Path.Combine(AudioFiles.Folder,category,game);
                 if(Directory.Exists(folder)){foreach(string file in Directory.GetFiles(folder))File.Delete(file);Directory.Delete(folder);}
             }
