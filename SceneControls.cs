@@ -18,6 +18,7 @@ sealed class SceneControls : IDisposable {
     readonly AudioClips audioClips;
     readonly TextBlock status, keys;
     readonly ComboBox resolution, videoFps;
+    readonly ComboBoxItem automaticResolution=new ComboBoxItem{Content="Del juego · automática"};
     readonly Button record, screenshot, edit;
     readonly DispatcherTimer timer;
     readonly string[] keyLabels = { "{", "}", "<" };
@@ -36,7 +37,7 @@ sealed class SceneControls : IDisposable {
         this.audioClips = audioClips;
         status = (TextBlock)ui.FindName("SceneStatus"); keys = (TextBlock)ui.FindName("SceneKeys");
         resolution = (ComboBox)ui.FindName("SceneResolution");
-        resolution.Items.Add("1080p"); resolution.Items.Add("720p"); resolution.SelectedIndex = 0;
+        resolution.Items.Add(automaticResolution);resolution.Items.Add("1080p"); resolution.Items.Add("720p"); resolution.SelectedIndex = 0;
         videoFps = (ComboBox)ui.FindName("SceneFps");
         videoFps.Items.Add("60 FPS"); videoFps.Items.Add("30 FPS"); videoFps.SelectedIndex = 0;
         record = (Button)ui.FindName("SceneRecord"); screenshot = (Button)ui.FindName("SceneScreenshot"); edit = (Button)ui.FindName("SceneEdit");
@@ -67,12 +68,13 @@ sealed class SceneControls : IDisposable {
     public void Load(System.Xml.XmlElement node) {
         for(int i=0;i<3;i++)shortcuts[i].Load(node,"atajoEscena"+i);
         UpdateKeyLabels();
-        resolution.SelectedIndex=node.GetAttribute("clipsResolucion")=="720p"?1:0;
+        string selected=node.GetAttribute("clipsResolucion45");
+        resolution.SelectedIndex=selected=="720p"?2:selected=="1080p"?1:0;
         videoFps.SelectedIndex = node.GetAttribute("clipsFps") == "30" ? 1 : 0;
     }
     public void Save(System.Xml.XmlWriter writer) {
         for(int i=0;i<3;i++)shortcuts[i].Save(writer,"atajoEscena"+i);
-        writer.WriteAttributeString("clipsResolucion", resolution.SelectedItem.ToString());
+        writer.WriteAttributeString("clipsResolucion45",resolution.SelectedIndex==0?"automatica":resolution.SelectedIndex==1?"1080p":"720p");
         writer.WriteAttributeString("clipsFps", videoFps.SelectedIndex == 1 ? "30" : "60");
     }
 
@@ -94,6 +96,7 @@ sealed class SceneControls : IDisposable {
 
     void Refresh() {
         bool valid = Valid();
+        if(valid){try{var bounds=BorderlessWindow.ClientBounds(target.H);valid=bounds.Width>1&&bounds.Height>1;string label="Del juego · "+bounds.Width+" × "+bounds.Height;if(!Equals(automaticResolution.Content,label))automaticResolution.Content=label;}catch(InvalidOperationException){valid=false;}}
         if (!valid && recording != null) Stop();
         if (valid && Native.GetForegroundWindow() == target.H && hwnd != IntPtr.Zero) {
             uint pid;
@@ -113,7 +116,7 @@ sealed class SceneControls : IDisposable {
             System.Media.SystemSounds.Asterisk.Play();
         }
         string state = recording == null ? "" : recording.Stopping ? "Finalizando MP4… " :
-            "● Grabando · " + recording.RecordedElapsed.ToString(@"mm\:ss") + "  ";
+            "● Grabando · " + recording.Width+" × "+recording.Height+" · "+recording.RecordedElapsed.ToString(@"mm\:ss") + "  ";
         if (capturing) state += "Capturando PNG… ";
         string message = state + (notice ?? (valid ? prepared!=null&&prepared.Error!=null?prepared.Error:
             prepared!=null&&prepared.Ready?"Captura lista · Se prioriza calidad, sin límite de peso.":"Preparando captura…" : "Selecciona la ventana del juego."));
@@ -154,7 +157,7 @@ sealed class SceneControls : IDisposable {
     async void Start() {
         if (recording != null || !Valid()||prepared==null||!prepared.Ready) return;
         try {
-            int limit = resolution.SelectedIndex==1?720:1080;
+            int limit = resolution.SelectedIndex==0?0:resolution.SelectedIndex==2?720:1080;
             int fps = videoFps.SelectedIndex == 1 ? 30 : 60;
             string game=CaptureFiles.Game(target);
             string path = SceneFiles.Output(CaptureFiles.Folder("Videos",game), game, ".mp4");
@@ -165,6 +168,7 @@ sealed class SceneControls : IDisposable {
             Refresh();
             lastVideo = await recording.Result;
             notice = "Clip con filtro guardado en " + lastVideo;
+            if(recording.CompletionNotice!=null)notice=recording.CompletionNotice+"\n"+notice;
         } catch (Exception ex) { notice = "No se pudo grabar: " + ex.GetBaseException().Message; }
         finally { audioClips.ReleaseVideoAudio(); recording = null; Refresh(); }
     }

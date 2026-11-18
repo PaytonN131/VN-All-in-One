@@ -44,9 +44,9 @@ sealed class PreparedScene : IDisposable {
             if(recording!=null)throw new IOException("Ya hay una grabación.");
             var area=BorderlessWindow.ClientBounds(target.H);
             if(area.Width<2||area.Height<2)throw new IOException("El área del juego está vacía.");
-            double scale=Math.Min(1,Math.Min(limit/(double)area.Height,limit*16.0/9/area.Width));
-            recording=new FastSceneRecording(audio,look,output,Math.Max(2,(int)(area.Width*scale)&~1),
-                Math.Max(2,(int)(area.Height*scale)&~1),fps,limit);
+            double scale=limit==0?1:Math.Min(1,Math.Min(limit/(double)area.Height,limit*16.0/9/area.Width));
+            recording=new FastSceneRecording(audio,look,output,limit==0?area.Width:Math.Max(2,(int)(area.Width*scale)&~1),
+                limit==0?area.Height:Math.Max(2,(int)(area.Height*scale)&~1),fps,limit,area.Width,area.Height);
             wake.Set();return recording;
         }
     }
@@ -65,9 +65,11 @@ sealed class PreparedScene : IDisposable {
             using(var capture=new WindowCapture(target.H)) {
                 var neutral=new SceneLook(0,0,1,1,0,1);
                 var startup=Stopwatch.StartNew();
+                int warmWidth=0,warmHeight=0;
                 while(!closing&&!Ready){
-                    var area=BorderlessWindow.ClientBounds(target.H);double scale=Math.Min(1,Math.Min(1080.0/area.Height,1920.0/area.Width));
-                    Ready=Frame(capture,neutral,Math.Max(2,(int)(area.Width*scale)&~1),Math.Max(2,(int)(area.Height*scale)&~1))!=null;
+                    var area=BorderlessWindow.ClientBounds(target.H);
+                    Ready=Frame(capture,neutral,area.Width,area.Height)!=null;
+                    if(Ready){warmWidth=area.Width;warmHeight=area.Height;}
                     if(!Ready&&startup.ElapsedMilliseconds>5000)throw new IOException("La ventana no entregó el primer fotograma.");
                     if(!Ready)wake.WaitOne(10);
                 }
@@ -89,11 +91,24 @@ sealed class PreparedScene : IDisposable {
                             active.Complete();
                             lock(gate)if(recording==active)recording=null;
                         } else if(active.FrameDue) {
-                            var frame=Frame(capture,active.Look,active.Width,active.Height,active.TakeBuffer());
-                            if(frame!=null)active.Add(frame.Pixels);
+                            var area=BorderlessWindow.ClientBounds(target.H);
+                            if(area.Width!=active.SourceWidth||area.Height!=active.SourceHeight){
+                                active.CompletionNotice="La ventana cambió de resolución. Se guardó este clip sin estirar la imagen; inicia otro para usar el nuevo tamaño.";
+                                active.Stop();
+                            }else{
+                                var frame=Frame(capture,active.Look,active.Width,active.Height,active.TakeBuffer());
+                                if(frame!=null)active.Add(frame.Pixels);
+                            }
                         }
                     }
-                    if(active==null)capture.Pump(BorderlessWindow.ClientBounds(target.H));
+                    if(active==null&&!Native.IsIconic(target.H)){
+                        var area=BorderlessWindow.ClientBounds(target.H);
+                        if(area.Width<2||area.Height<2)Ready=false;
+                        else if(!Ready||area.Width!=warmWidth||area.Height!=warmHeight){
+                            Ready=Frame(capture,neutral,area.Width,area.Height)!=null;
+                            if(Ready){warmWidth=area.Width;warmHeight=area.Height;}
+                        }else capture.Pump(area);
+                    }
                     wake.WaitOne(active==null&&pending==null?16:1);
                 }
             }
@@ -113,7 +128,8 @@ sealed class FastSceneRecording {
     readonly GameAudio audio;
     readonly string output;
     readonly int fps,bitrate;
-    readonly BlockingCollection<byte[]> frames=new BlockingCollection<byte[]>(48),samples=new BlockingCollection<byte[]>(256);
+    readonly BlockingCollection<byte[]> frames;
+    readonly BlockingCollection<byte[]> samples=new BlockingCollection<byte[]>(256);
     readonly ManualResetEventSlim firstFrame=new ManualResetEventSlim(false);
     readonly ConcurrentBag<byte[]> buffers=new ConcurrentBag<byte[]>();
     readonly object audioGate=new object();
@@ -126,6 +142,8 @@ sealed class FastSceneRecording {
     long firstFrameTicks;
     public double FirstFrameMilliseconds {get{return Interlocked.Read(ref firstFrameTicks)*1000.0/Stopwatch.Frequency;}}
     public readonly int Width,Height;
+    public readonly int SourceWidth,SourceHeight;
+    public string CompletionNotice;
     public readonly SceneLook Look;
     public readonly Task<string> Result;
     public bool Stopping { get { return stopping; } }
@@ -134,8 +152,12 @@ sealed class FastSceneRecording {
     public bool FrameDue { get {return clock.Elapsed.TotalSeconds*fps>=count;} }
     public byte[] TakeBuffer(){byte[] data;return buffers.TryTake(out data)?data:new byte[checked(Width*Height*4)];}
     public TimeSpan RecordedElapsed { get {return clock.Elapsed;} }
-    public FastSceneRecording(GameAudio audio,SceneLook look,string output,int width,int height,int fps,int limit=1080) {
-        this.audio=audio;Look=look;this.output=output;Width=width;Height=height;this.fps=fps;bitrate=fps==60?(limit==720?6:10):(limit==720?4:7);
+    public FastSceneRecording(GameAudio audio,SceneLook look,string output,int width,int height,int fps,int limit=1080,int sourceWidth=0,int sourceHeight=0) {
+        this.audio=audio;Look=look;this.output=output;Width=width;Height=height;this.fps=fps;
+        SourceWidth=sourceWidth==0?width:sourceWidth;SourceHeight=sourceHeight==0?height:sourceHeight;
+        int standard=fps==60?(limit==720?6:10):(limit==720?4:7);
+        bitrate=(int)Math.Ceiling(standard*Math.Max(1,width*(double)height/(1920*1080)));
+        frames=new BlockingCollection<byte[]>((int)Math.Max(8,Math.Min(48,384L*1024*1024/(width*(long)height*4))));
         receive=delegate(IntPtr input,int length) {
             lock(audioGate) {
                 if(completed)return;

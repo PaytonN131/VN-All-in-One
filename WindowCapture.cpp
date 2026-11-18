@@ -300,7 +300,7 @@ float4 color(Vertex v) : SV_Target {
 
     bool Snapshot(RECT area, BYTE* pixels, UINT width, UINT height, FilterSettings settings) {
         CaptureFrame(area);
-        if(!cachedFrame)return false;
+        if(!cachedFrame||inWidth!=UINT(area.right-area.left)||inHeight!=UINT(area.bottom-area.top))return false;
         SetupShaders();
         if(!photo || photoWidth!=width || photoHeight!=height){
             photoTarget=nullptr;photo=nullptr;photoRead=nullptr;
