@@ -1,10 +1,10 @@
 # VN-All-in-One
 
-**Nitidez VN 4.4**
+**Nitidez VN 4.5**
 
 Ajusta la imagen de tus novelas visuales, guarda sus voces y captura tus escenas favoritas.
 
-[Descargar Nitidez VN 4.4](https://github.com/PaytonN131/VN-All-in-One/releases/tag/v4.4.0)
+[Descargar Nitidez VN 4.5](https://github.com/PaytonN131/VN-All-in-One/releases/tag/v4.5.0)
 
 ![Nitidez VN](docs/inicio.png)
 
@@ -32,7 +32,13 @@ Los botones para descartar audio o enviar un clip a la Papelera están separados
 
 ## Grabación
 
-Esta versión recupera el formato MP4 compatible y los ajustes de grabación de la 3.0. La captura ya está preparada cuando pulsas: conserva los fotogramas mientras el archivo empieza a escribirse, sin descartar un segundo al principio.
+En **Clips → Tamaño del clip**, deja **Del juego — automática** para grabar al tamaño actual de la imagen de la novela. El programa muestra sus dimensiones y conserva el filtro, sin forzar la imagen a 1080p ni estirarla. Por ejemplo, si el área del juego mide **1280×720**, el clip también medirá **1280×720**, aunque el monitor use otra resolución.
+
+Las opciones 1080p y 720p siguen disponibles si quieres reducir el trabajo del equipo. Para conservar el tamaño del juego, usa la opción automática. Una resolución mayor necesita más recursos y puede producir archivos más grandes.
+
+Cada clip mantiene el tamaño con el que empezó. Si cambias la resolución del juego mientras grabas, el clip se guarda y aparece un aviso: inicia otro para usar el nuevo tamaño. Así se evita deformar la imagen.
+
+La captura ya está preparada cuando pulsas: conserva los fotogramas mientras el archivo empieza a escribirse, sin descartar un segundo al principio.
 
 Usa **60 FPS** para escenas con movimiento. El archivo conserva el filtro aplicado. No se vuelve a comprimir para hacerlo más pequeño ni se impone un límite de MB. El tamaño depende de la duración y los ajustes que elijas.
 
