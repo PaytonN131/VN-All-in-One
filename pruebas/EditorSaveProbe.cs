@@ -14,7 +14,7 @@ static class EditorSaveProbe {
     static object Field(object value,string name){return value.GetType().GetField(name,Private).GetValue(value);}
     static void Pump(){var frame=new DispatcherFrame();var timer=new DispatcherTimer{Interval=TimeSpan.FromMilliseconds(20)};timer.Tick+=delegate{timer.Stop();frame.Continue=false;};timer.Start();Dispatcher.PushFrame(frame);}
     static void Await(Task task){var clock=System.Diagnostics.Stopwatch.StartNew();while(!task.IsCompleted&&clock.ElapsedMilliseconds<20000)Pump();if(!task.IsCompleted)throw new Exception("El guardado no terminó automáticamente.");task.GetAwaiter().GetResult();}
-    static void Render(Window window,string file){window.UpdateLayout();var view=(FrameworkElement)window.Content;var bitmap=new RenderTargetBitmap((int)view.ActualWidth,(int)view.ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(view);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var output=File.Create(file))png.Save(output);}
+    static void Render(Window window,string file){window.UpdateLayout();var bitmap=new RenderTargetBitmap((int)window.ActualWidth,(int)window.ActualHeight,96,96,PixelFormats.Pbgra32);bitmap.Render(window);var png=new PngBitmapEncoder();png.Frames.Add(BitmapFrame.Create(bitmap));using(var output=File.Create(file))png.Save(output);}
     [STAThread] static int Main(string[] args){
         new Application{ShutdownMode=ShutdownMode.OnExplicitShutdown};
         System.Threading.SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));

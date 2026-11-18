@@ -235,6 +235,7 @@ sealed class SceneEditor : Window {
     readonly MediaElement media = new MediaElement { LoadedBehavior = MediaState.Manual,
         UnloadedBehavior = MediaState.Close, ScrubbingEnabled = true, Stretch = Stretch.Uniform };
     readonly Slider position = new Slider(), start = new Slider(), end = new Slider();
+    readonly TextBlock positionTime=new TextBlock{Margin=new Thickness(0,0,0,10)};
     readonly TextBlock trimInfo = new TextBlock(), status = new TextBlock { TextWrapping = TextWrapping.Wrap };
     readonly Button play = new Button { Content = "▶", ToolTip = "Reproducir tramo", FontSize = 18 },
         stop = new Button { Content = "■", ToolTip = "Detener", FontSize = 18 },
@@ -253,28 +254,20 @@ sealed class SceneEditor : Window {
     public SceneEditor(Window owner, ResourceDictionary style, string source,string game=null) {
         Owner = owner; this.source = source; Resources.MergedDictionaries.Add(style);
         outputFolder=CaptureFiles.Inside(source,SceneFiles.Videos)?Path.GetDirectoryName(source):CaptureFiles.Folder("Videos",game??"Otros");
-        Title = "Nitidez VN · Recortar clip"; Width = 760;
-        Height = Math.Min(720, SystemParameters.WorkArea.Height - 25);
-        MinWidth = 520; MinHeight = 460; WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Title = "Nitidez VN · Editar clip"; Width = Math.Min(1120,SystemParameters.WorkArea.Width-30);
+        Height = Math.Min(860, SystemParameters.WorkArea.Height - 25);
+        MinWidth = 940; MinHeight = 680; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = new SolidColorBrush(Color.FromRgb(33,29,38)); Foreground = Brushes.White;
-        var root = new DockPanel { Margin = new Thickness(18) };
-        Content = root;
-        var title = new TextBlock { Text = Path.GetFileName(source), FontSize = 17, Margin = new Thickness(0, 0, 0, 8) };
-        DockPanel.SetDock(title, Dock.Top); root.Children.Add(title);
-        var controls = new StackPanel();
-        DockPanel.SetDock(controls, Dock.Bottom); root.Children.Add(controls);
-        controls.Children.Add(new TextBlock { Text = "Posición de vista previa", Margin = new Thickness(0, 8, 0, 0) });
-        controls.Children.Add(position);
-        controls.Children.Add(trimInfo);
-        controls.Children.Add(new TextBlock { Text = "Inicio del recorte" }); controls.Children.Add(start);
-        controls.Children.Add(new TextBlock { Text = "Final del recorte" }); controls.Children.Add(end);
-        controls.Children.Add(new TextBlock{Text="Nombre del clip que vas a guardar (sin .mp4)",Margin=new Thickness(0,8,0,0)});
-        fileName.Text="Recorte_"+DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");controls.Children.Add(fileName);
-        var actions = new WrapPanel { Margin = new Thickness(0, 8, 0, 8) };
-        foreach (var button in new[] { play, stop, markStart, markEnd, save, recycle, folderButton }) { button.Margin = new Thickness(0, 0, 8, 4); actions.Children.Add(button); }
-        controls.Children.Add(actions); controls.Children.Add(status);
-        root.Children.Add(new Border { Background = Brushes.Black, Child = media });
-
+        StackPanel main,side;EditorLayout.Shell(this,"Editar clip",Path.GetFileName(source),out main,out side);
+        var preview=EditorLayout.Card(main,"1. Busca el momento");preview.Children.Add(new Border{Background=Brushes.Black,Height=200,Child=media,CornerRadius=new CornerRadius(6),Margin=new Thickness(0,0,0,12)});
+        preview.Children.Add(EditorLayout.Note("Mueve la barra para buscar el inicio o el final de la escena."));preview.Children.Add(position);preview.Children.Add(positionTime);
+        play.Content="▶ Ver selección";stop.Content="■ Detener";EditorLayout.Buttons(preview,play,stop);
+        var trim=EditorLayout.Card(main,"2. Elige qué conservar");
+        EditorLayout.Range(trim,new TextBlock{Text="Inicio"},start,new TextBlock{Text="Final"},end,markStart,markEnd);trimInfo.Margin=new Thickness(0,12,0,0);trimInfo.TextWrapping=TextWrapping.Wrap;trim.Children.Add(trimInfo);
+        var output=EditorLayout.Card(side,"3. Guarda el recorte");output.Children.Add(EditorLayout.Note("Nombre del nuevo archivo, sin .mp4. El clip original se conserva."));fileName.Text="Recorte_"+DateTime.Now.ToString("yyyy-MM-dd_HH-mm-ss");output.Children.Add(fileName);EditorLayout.SaveButton(save);output.Children.Add(save);folderButton.Margin=new Thickness(0,0,0,14);output.Children.Add(folderButton);output.Children.Add(EditorLayout.Note("Se guarda en la carpeta del juego, sin límite de peso."));
+        var message=EditorLayout.Card(side,"Estado");message.Children.Add(status);
+        recycle.Content="Enviar original a la Papelera";recycle.Margin=new Thickness(0,0,0,10);side.Children.Add(recycle);
+        side.Children.Add(EditorLayout.Note("Esta opción retira el clip que abriste. Guardar un recorte crea otro archivo."));
         timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(40) };
         timer.Tick += delegate {
             if (media.Position.TotalSeconds >= end.Value) { Pause(); Seek(end.Value); }
@@ -297,7 +290,7 @@ sealed class SceneEditor : Window {
             ready = false; Pause(); status.Text = "No se pudo reproducir el clip: " + e.ErrorException.Message; UpdateControls();
         };
         media.MediaEnded += delegate { Pause(); Seek(end.Value); };
-        position.ValueChanged += delegate { if (ready && !updating) { Pause(); media.Position = TimeSpan.FromSeconds(position.Value); } };
+        position.ValueChanged += delegate { if (ready && !updating) { Pause(); media.Position = TimeSpan.FromSeconds(position.Value);positionTime.Text=String.Format("Posición {0:F2} s / {1:F2} s",position.Value,end.Maximum); } };
         start.ValueChanged += delegate { Adjust(true); };
         end.ValueChanged += delegate { Adjust(false); };
         play.Click += delegate { if (playing) Pause(); else { Seek(start.Value); media.Play(); playing = true; timer.Start(); } };
@@ -329,7 +322,7 @@ sealed class SceneEditor : Window {
     }
 
     void SetPosition(double seconds) {
-        updating = true; position.Value = seconds; updating = false;
+        updating = true; position.Value = seconds; updating = false;positionTime.Text=String.Format("Posición {0:F2} s / {1:F2} s",seconds,end.Maximum);
     }
     void Seek(double seconds) { if (ready) { media.Position = TimeSpan.FromSeconds(seconds); SetPosition(seconds); } }
     void Pause() { timer.Stop(); media.Pause(); playing = false; }

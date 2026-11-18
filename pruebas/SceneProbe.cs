@@ -79,7 +79,7 @@ static class SceneProbe {
                 }
                 Console.WriteLine("PASS: 3 cambios de diálogo tras periodos inactivos, sin fotogramas antiguos; cursor de Windows excluido al crear la sesión.");
                 scene.Background=new SolidColorBrush(Color.FromRgb(64,80,128));await Task.Delay(50);
-                int limit = 0;
+                int limit = motion?1080:720;
                 int fps = args.Length > 2 && args[2] == "30" ? 30 : 60;
                 string source = SceneFiles.Source(hwnd, limit, 60);
                 string png = SceneFiles.Output(folder, "Captura", ".png");
@@ -109,7 +109,7 @@ static class SceneProbe {
                     player.Load(); player.PlayLooping();
                     var capture = prepared.Start(audio,look,SceneFiles.Output(folder, "Video", ".mp4"),limit,fps);
                     while (!capture.HasFrames && !capture.Result.IsCompleted) await Task.Delay(50);
-                    Console.WriteLine("Primer fotograma conservado: {0:F1} ms", capture.Elapsed.TotalMilliseconds);
+                    Console.WriteLine("Primer fotograma conservado: {0:F1} ms", capture.FirstFrameMilliseconds);
                     await Task.Delay(550);
                     foreach (var p in Process.GetProcessesByName("ffmpeg")) using (p) {
                         if (!before.Contains(p.Id) && !p.HasExited)

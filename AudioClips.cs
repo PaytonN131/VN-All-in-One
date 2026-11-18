@@ -221,26 +221,21 @@ sealed class ClipEditor : Window {
     public ClipEditor(Window owner, ResourceDictionary style, ObservableCollection<AudioClip> clips) {
         Owner = owner; this.clips = clips;
         Resources.MergedDictionaries.Add(style);
-        Title = "Nitidez VN · Clips de audio"; Width = 740; MinWidth = 610; SizeToContent = SizeToContent.Height;
+        Title = "Nitidez VN · Editar audio"; Width = Math.Min(1060,SystemParameters.WorkArea.Width-30); Height=Math.Min(820,SystemParameters.WorkArea.Height-30);MinWidth = 900;MinHeight=620;
         ResizeMode = ResizeMode.CanResize; WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = new SolidColorBrush(Color.FromRgb(33,29,38)); Foreground = Brushes.White;
-        var root = new StackPanel { Margin = new Thickness(22) };
-        Content = root;
-        root.Children.Add(new TextBlock { Text = "Recorta tu clip", FontSize = 24, Margin = new Thickness(0,0,0,12) });
-        list.ItemsSource = clips; root.Children.Add(list);
-        root.Children.Add(new TextBlock { Text = "Arrastra las marcas de inicio y final sobre la onda.", Margin = new Thickness(0,12,0,0) });
-        root.Children.Add(wave);
-        root.Children.Add(startText); root.Children.Add(start);
-        root.Children.Add(endText); root.Children.Add(end);
-        root.Children.Add(new TextBlock{Text="Nombre del audio (sin .mp3)",Margin=new Thickness(0,12,0,0)});root.Children.Add(fileName);
+        StackPanel main,side;EditorLayout.Shell(this,"Editar audio","Escoge una frase, ajusta el tramo y guárdalo con el nombre que quieras.",out main,out side);
+        var choose=EditorLayout.Card(main,"1. Elige y escucha");
+        list.ItemsSource=clips;choose.Children.Add(list);wave.Height=160;choose.Children.Add(wave);
+        play.Content="▶ Escuchar";play.Width=Double.NaN;stop.Content="■ Detener";stop.Width=Double.NaN;EditorLayout.Buttons(choose,play,stop);choose.Children.Add(playbackTime);
+        var trim=EditorLayout.Card(main,"2. Ajusta el tramo");trim.Children.Add(EditorLayout.Note("Arrastra la marca verde para el inicio y la naranja para el final. También puedes usar estos controles."));
+        EditorLayout.Range(trim,startText,start,endText,end);
+        var output=EditorLayout.Card(side,"3. Guarda el audio");output.Children.Add(EditorLayout.Note("Nombre del archivo, sin .mp3. Se guarda directamente en la carpeta de este juego."));output.Children.Add(fileName);EditorLayout.SaveButton(save);output.Children.Add(save);folderButton.Margin=new Thickness(0,0,0,14);output.Children.Add(folderButton);
+        output.Children.Add(EditorLayout.Note("Si ya existe ese nombre, se añade un número para conservar ambos archivos."));
+        var message=EditorLayout.Card(side,"Estado");message.Children.Add(status);
+        discard.Content="Descartar este audio";discard.Margin=new Thickness(0,0,0,8);side.Children.Add(discard);
+        side.Children.Add(EditorLayout.Note("Descartar libera el audio pendiente. No borra los MP3 que ya guardaste."));
         fileName.TextChanged+=delegate{if(!updating&&Current!=null)Current.FileName=fileName.Text;};
-        var actions = new WrapPanel { Margin = new Thickness(0,10,0,10) };
-        foreach (var button in new[] { play, stop, save, discard, folderButton }) {
-            button.Margin = new Thickness(0,0,8,6);
-            actions.Children.Add(button);
-        }
-        actions.Children.Add(playbackTime);
-        root.Children.Add(actions); root.Children.Add(status);
         System.Windows.Automation.AutomationProperties.SetName(play, "Reproducir tramo seleccionado");
         System.Windows.Automation.AutomationProperties.SetName(stop, "Detener reproducción");
         list.SelectionChanged += delegate { SelectClip(); };
