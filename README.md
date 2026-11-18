@@ -1,10 +1,10 @@
 # VN-All-in-One
 
-**Nitidez VN 4.5**
+**Nitidez VN 4.6**
 
 Ajusta la imagen de tus novelas visuales, guarda sus voces y captura tus escenas favoritas.
 
-[Descargar Nitidez VN 4.5](https://github.com/PaytonN131/VN-All-in-One/releases/tag/v4.5.0)
+[Descargar Nitidez VN 4.6](https://github.com/PaytonN131/VN-All-in-One/releases/tag/v4.6.0)
 
 ![Nitidez VN](docs/inicio.png)
 
@@ -22,7 +22,7 @@ Atajos iniciales: **.** para audio, **{** para empezar un clip, **}** para termi
 
 ## Editar audio y clips
 
-Los dos editores están organizados en tres pasos:
+El editor de clips abre con una vista previa grande a la izquierda y los controles a la derecha. Muestra la imagen sin deformarla y evita ampliarla por encima de su tamaño original cuando cabe. En audio se mantiene la onda con las marcas de recorte.
 
 1. **Elige y revisa.** Selecciona el audio o busca el momento del clip. Usa **▶** para escuchar o ver la selección.
 2. **Ajusta el tramo.** Cambia el inicio y el final. En audio puedes arrastrar las marcas de la onda; en clips puedes marcar la posición que estás viendo.
@@ -40,15 +40,19 @@ Cada clip mantiene el tamaño con el que empezó. Si cambias la resolución del 
 
 La captura ya está preparada cuando pulsas: conserva los fotogramas mientras el archivo empieza a escribirse, sin descartar un segundo al principio.
 
-Usa **60 FPS** para escenas con movimiento. El archivo conserva el filtro aplicado. No se vuelve a comprimir para hacerlo más pequeño ni se impone un límite de MB. El tamaño depende de la duración y los ajustes que elijas.
+Los clips nuevos usan un ajuste de calidad más alto para conservar mejor las letras, las líneas finas y el detalle. El filtro sigue aplicado y se conserva la resolución del juego. Usa **60 FPS** para escenas con movimiento. No se impone un límite de MB: el peso depende de la escena y la duración.
+
+La mejora se aplica a las grabaciones nuevas. No puede recuperar detalle que ya se perdió en un archivo anterior. Si amplías un clip de 1280×720 a pantalla completa, se verá más grande, pero seguirá teniendo los mismos píxeles.
 
 ## Tus archivos
 
-Se guardan en **D:\Archivos VN All in One**, separados en **Capturas**, **Grabaciones** y **Videos**, con una subcarpeta por juego. Si no tienes unidad D:, se usa Documentos. Las carpetas se crean solas.
+Se guardan en **D:\Archivos VN All in One**, separados en **Capturas**, **Grabaciones** y **Clips**, con una subcarpeta por juego. Si no tienes unidad D:, se usa Documentos. Las carpetas se crean solas.
 
 En **Inicio** puedes corregir el nombre del juego. Las capturas llevan nombres como **Wagamama_01.png**. Si un nombre de audio o recorte ya existe al guardar, se añade un número para conservar ambos.
 
-Los archivos de versiones anteriores no se mueven ni se borran. El cursor de Windows queda fuera de las capturas y los clips; uno dibujado dentro del propio juego puede aparecer.
+Al actualizar, **Videos pasa a llamarse Clips**. Se conservan los archivos y las subcarpetas de cada juego. Si Clips ya existe, se unen las carpetas sin reemplazar archivos con el mismo nombre. Cierra la versión anterior y los reproductores antes de actualizar para que Windows permita el cambio.
+
+El cursor de Windows queda fuera de las capturas y los clips; uno dibujado dentro del propio juego puede aparecer.
 
 ## Antes de empezar
 
