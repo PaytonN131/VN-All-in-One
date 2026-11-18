@@ -127,7 +127,7 @@ sealed class PreparedScene : IDisposable {
 sealed class FastSceneRecording {
     readonly GameAudio audio;
     readonly string output;
-    readonly int fps,bitrate;
+    readonly int fps;
     readonly BlockingCollection<byte[]> frames;
     readonly BlockingCollection<byte[]> samples=new BlockingCollection<byte[]>(256);
     readonly ManualResetEventSlim firstFrame=new ManualResetEventSlim(false);
@@ -155,8 +155,6 @@ sealed class FastSceneRecording {
     public FastSceneRecording(GameAudio audio,SceneLook look,string output,int width,int height,int fps,int limit=1080,int sourceWidth=0,int sourceHeight=0) {
         this.audio=audio;Look=look;this.output=output;Width=width;Height=height;this.fps=fps;
         SourceWidth=sourceWidth==0?width:sourceWidth;SourceHeight=sourceHeight==0?height:sourceHeight;
-        int standard=fps==60?(limit==720?6:10):(limit==720?4:7);
-        bitrate=(int)Math.Ceiling(standard*Math.Max(1,width*(double)height/(1920*1080)));
         frames=new BlockingCollection<byte[]>((int)Math.Max(8,Math.Min(48,384L*1024*1024/(width*(long)height*4))));
         receive=delegate(IntPtr input,int length) {
             lock(audioGate) {
@@ -193,8 +191,8 @@ sealed class FastSceneRecording {
             using(var pipe=new NamedPipeServerStream(name,PipeDirection.Out,1,PipeTransmissionMode.Byte,PipeOptions.Asynchronous,0,32768))
             using(var process=SceneFiles.Start("-nofind_stream_info -thread_queue_size 4 -f rawvideo -pixel_format bgra -video_size "+
                 Width+"x"+Height+" -framerate "+fps+" -i pipe:0 -nofind_stream_info -thread_queue_size 16 -f s16le -ar 44100 -ac 2 -i "+
-                SceneFiles.Quote(@"\\.\pipe\"+name)+" -map 0:v:0 -map 1:a:0 -c:v h264_nvenc -preset p3 -tune ll -bf 0 -g "+fps*2+" -surfaces 6 -zerolatency 1"+
-                " -rc cbr -b:v "+bitrate+"M -maxrate "+bitrate+"M -bufsize "+bitrate+"M -pix_fmt yuv420p -c:a aac -b:a 160k -shortest -movflags +faststart -f mp4 "+SceneFiles.Quote(temp),true)) {
+                SceneFiles.Quote(@"\\.\pipe\"+name)+" -map 0:v:0 -map 1:a:0 "+SceneFiles.CompatibleEncoding+" -g "+fps*2+" -surfaces 6 -zerolatency 1"+
+                " -shortest -movflags +faststart -f mp4 "+SceneFiles.Quote(temp),true)) {
                 var errors=process.StandardError.ReadToEndAsync();process.BeginOutputReadLine();
                 var connected=pipe.WaitForConnectionAsync();
                 var video=Task.Run(delegate {

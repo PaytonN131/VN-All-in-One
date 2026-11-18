@@ -43,9 +43,9 @@ vec4 hook() {{
 }
 
 static class SceneFiles {
-    public const string CompatibleEncoding="-c:v h264_nvenc -preset p3 -tune ll -bf 0 -rc vbr -cq 18 -b:v 0 -pix_fmt yuv420p -c:a aac -b:a 160k";
-    public const long PreferredVideoBytes = 30000000;
-    public static readonly string Videos = Path.Combine(AudioFiles.Folder, "Videos");
+    public const string VideoQualityEncoding="-vf scale=out_color_matrix=bt709:out_range=tv -c:v h264_nvenc -preset p4 -tune hq -rc constqp -qp 8 -bf 0 -rc-lookahead 0 -pix_fmt yuv420p -color_range tv -colorspace bt709 -color_primaries bt709 -color_trc bt709";
+    public const string CompatibleEncoding=VideoQualityEncoding+" -c:a aac -b:a 160k";
+    public static readonly string Clips = Path.Combine(AudioFiles.Folder, "Clips");
     public static readonly string Screenshots = Path.Combine(AudioFiles.Folder, "Capturas");
     [DllImport("WindowCapture.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
     static extern int NVRecycle(IntPtr owner, string path);
@@ -127,7 +127,7 @@ static class SceneFiles {
         RunFile("-ss "+Number(start)+" -i "+Quote(source)+" -t "+Number(end-start)+" -map 0:v:0 -map 0:a:0? "+CompatibleEncoding+" -fps_mode passthrough -movflags +faststart -f mp4",dest,1800000);
     }
     public static void Preview(string source,string dest,CancellationToken cancellation){
-        RunFile("-i "+Quote(source)+" -map 0:v:0 -map 0:a:0? -vf "+Quote("scale=-2:'min(ih,540)'")+" -c:v libx264 -preset ultrafast -crf 26 -pix_fmt yuv420p -threads:v 2 -c:a aac -b:a 96k -movflags +faststart -f mp4",dest,1800000,cancellation);
+        RunFile("-i "+Quote(source)+" -map 0:v:0 -map 0:a:0? "+CompatibleEncoding+" -movflags +faststart -f mp4",dest,1800000,cancellation);
     }
 
     public static double Duration(string source, double fallback) {
